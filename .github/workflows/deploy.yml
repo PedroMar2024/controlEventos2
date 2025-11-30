@@ -1,0 +1,109 @@
+name: Build and Deploy Laravel to FTP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v4
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, intl, pdo_mysql
+          tools: composer:v2
+
+      - name: Composer install (no dev)
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Build frontend assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create production .env from repository secrets
+        env:
+          APP_NAME: ${{ secrets.APP_NAME }}
+          APP_URL: ${{ secrets.APP_URL }}
+          DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          MAIL_HOST: ${{ secrets.MAIL_HOST }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_ENCRYPTION: ${{ secrets.MAIL_ENCRYPTION }}
+        run: |
+          cat > .env <<'EOF'
+          APP_NAME="${APP_NAME}"
+          APP_ENV=production
+          APP_KEY=
+          APP_DEBUG=false
+          APP_URL="${APP_URL}"
+          LOG_CHANNEL=stack
+          DB_CONNECTION=${DB_CONNECTION}
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_DATABASE=${DB_DATABASE}
+          DB_USERNAME=${DB_USERNAME}
+          DB_PASSWORD=${DB_PASSWORD}
+          BROADCAST_DRIVER=log
+          CACHE_DRIVER=file
+          SESSION_DRIVER=file
+          QUEUE_CONNECTION=sync
+          MAIL_MAILER=smtp
+          MAIL_HOST=${MAIL_HOST}
+          MAIL_PORT=${MAIL_PORT}
+          MAIL_USERNAME=${MAIL_USERNAME}
+          MAIL_PASSWORD=${MAIL_PASSWORD}
+          MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+          EOF
+
+      - name: Generate APP_KEY
+        run: php artisan key:generate --no-interaction
+
+      - name: Optimize framework
+        run: |
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+      - name: Run migrations on remote DB (optional)
+        if: ${{ secrets.RUN_MIGRATIONS == 'true' }}
+        run: php artisan migrate --force
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@4.0.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }}
+          protocol: ftp
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          git-ftp-args: --insecure
+          exclude: |
+            .github
+            .git
+            node_modules
+            tests
+            .env.example
+            .env
+            .github/workflows
