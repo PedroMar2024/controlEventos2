@@ -9,6 +9,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    # mapear el secret RUN_MIGRATIONS a una variable de entorno del job
+    env:
+      RUN_MIGRATIONS: ${{ secrets.RUN_MIGRATIONS }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,8 +88,9 @@ jobs:
           php artisan route:cache
           php artisan view:cache
 
+      # usar env.RUN_MIGRATIONS en lugar de secrets directamente
       - name: Run migrations on remote DB (optional)
-        if: ${{ secrets.RUN_MIGRATIONS == 'true' }}
+        if: ${{ env.RUN_MIGRATIONS == 'true' }}
         run: php artisan migrate --force
 
       - name: FTP Deploy
