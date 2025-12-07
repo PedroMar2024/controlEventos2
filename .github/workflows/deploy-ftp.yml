@@ -1,0 +1,52 @@
+name: Deploy via FTP (Laravel)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+
+      - name: Composer install (no dev) + optimized autoload
+        env:
+          APP_ENV: production
+        run: |
+          composer install --no-dev --prefer-dist --no-interaction --no-progress
+          composer dump-autoload -o
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@4.0.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}/
+          exclude: |
+            .git/**
+            .github/**
+            node_modules/**
+            tests/**
+            .env
+            .env.example
+            storage/*.log
+            storage/framework/cache/**
+            storage/framework/sessions/**
+            storage/framework/views/**
+            vendor/bin/**
+            composer.lock
+            composer.lock
