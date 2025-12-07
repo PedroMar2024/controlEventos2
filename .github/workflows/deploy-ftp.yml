@@ -34,8 +34,10 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
-          local-dir: ./
-          server-dir: ./
+          local-dir: ./                 # sube todo desde el repo
+          server-dir: ./                # sube al home del usuario FTP; no duplica public_html
+          # Si querés limpiar el remoto ANTES de subir (evita duplicados y basura), activá:
+          # dangerous-clean-slate: true
           exclude: |
             .git/**
             .github/**
@@ -50,12 +52,13 @@ jobs:
             vendor/bin/**
             composer.lock
 
-      # ESTE ES EL STEP DE MIGRACIONES. VA EXACTAMENTE AQUÍ, DESPUÉS DE "FTP Deploy".
+      # Migraciones desactivadas por defecto. Solo corre si activás ENABLE_MIGRATIONS=true.
       - name: Run migrations (HTTP trigger)
         env:
           MIGRATE_URL: ${{ secrets.MIGRATE_URL }}
           MIGRATE_TOKEN: ${{ secrets.MIGRATE_TOKEN }}
-        if: env.MIGRATE_URL && env.MIGRATE_TOKEN
+          ENABLE_MIGRATIONS: ${{ vars.ENABLE_MIGRATIONS }}
+        if: ${{ env.MIGRATE_URL != '' && env.MIGRATE_TOKEN != '' && env.ENABLE_MIGRATIONS == 'true' }}
         run: |
-            curl -fsSL -X POST "$MIGRATE_URL" \
-            -H "X-Migrate-Token: $MIGRATE_TOKEN"
+          curl -fsSL --retry 5 --retry-delay 3 -X POST "${MIGRATE_URL}" \
+            -H "X-Migrate-Token: ${MIGRATE_TOKEN}"
