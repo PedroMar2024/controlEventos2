@@ -4,57 +4,126 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use App\Models\User;
-use Throwable;
+use App\Models\Persona;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
     public function run()
     {
-        // Informar inicio
-        $this->command->info('Iniciando RolesAndPermissionsSeeder');
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Limpiar caché de permisos/roles
-        if (app()->bound(\Spatie\Permission\PermissionRegistrar::class)) {
-            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-            $this->command->info('Cache de permisos limpiada');
-        }
+        // Permisos base del sistema
+        $permisos = [
+            // Eventos
+            'ver-eventos',
+            'crear-eventos',
+            'editar-eventos',
+            'eliminar-eventos', // SOLO superadmin y admin_evento global (y admin del evento por pivot)
 
-        // Crear roles (solo si no existen)
-        $roles = ['admin','user','client'];
-        foreach ($roles as $r) {
-            $role = Role::firstOrCreate(['name' => $r]);
-            $this->command->info("Rol asegurado: {$role->name}");
-        }
+            // Acciones del evento
+            'aprobar-eventos',
+            'cancelar-eventos',
+            'duplicar-eventos',
 
-        // Usuarios de prueba reproducibles
-        $users = [
-            ['email' => 'admin@example.com',  'name' => 'Admin Demo',  'password' => bcrypt('password'), 'role' => 'admin'],
-            ['email' => 'user@example.com',   'name' => 'User Demo',   'password' => bcrypt('secret'),   'role' => 'user'],
-            ['email' => 'client@example.com', 'name' => 'Client Demo', 'password' => bcrypt('secret'),   'role' => 'client'],
+            // Invitados / opciones básicas
+            'ver-opciones',
+            'elegir-opciones',
+
+            // Usuarios
+            'ver-usuarios',
+            'crear-usuarios',
+            'editar-usuarios',
+            'eliminar-usuarios',
+            'asignar-roles',
+
+            // Reportes
+            'ver-reportes',
+            'generar-reportes',
+            'exportar-reportes',
+
+            // Configuración
+            'ver-configuracion',
+            'editar-configuracion',
         ];
 
-        foreach ($users as $uData) {
-            $u = User::firstOrCreate(
-                ['email' => $uData['email']],
-                ['name' => $uData['name'], 'password' => $uData['password']]
-            );
-
-            $this->command->info("Usuario asegurado: {$u->email} (id={$u->id})");
-
-            // Intentar asignar rol y capturar excepción si falla
-            try {
-                if (! $u->hasRole($uData['role'])) {
-                    $u->assignRole($uData['role']);
-                    $this->command->info("Rol '{$uData['role']}' asignado a {$u->email}");
-                } else {
-                    $this->command->info("Usuario {$u->email} ya tiene rol '{$uData['role']}'");
-                }
-            } catch (Throwable $e) {
-                $this->command->error("Error asignando rol a {$u->email}: ".$e->getMessage());
-            }
+        foreach ($permisos as $p) {
+            Permission::firstOrCreate(['name' => $p], ['guard_name' => 'web']);
         }
 
-        $this->command->info('Seeder finalizado');
+        // Roles globales
+        $superadmin     = Role::firstOrCreate(['name' => 'superadmin']);
+        $adminEvento    = Role::firstOrCreate(['name' => 'admin_evento']);
+        $subadminEvento = Role::firstOrCreate(['name' => 'subadmin_evento']);
+        $invitado       = Role::firstOrCreate(['name' => 'invitado']);
+
+        // Asignación de permisos a roles
+        // superadmin: todo
+        $superadmin->syncPermissions(Permission::all());
+
+        // admin_evento: casi todo (incluye eliminar-eventos global)
+        $adminEvento->syncPermissions([
+            'ver-eventos','crear-eventos','editar-eventos','eliminar-eventos',
+            'aprobar-eventos','cancelar-eventos','duplicar-eventos',
+            'ver-opciones','elegir-opciones',
+            'ver-usuarios','crear-usuarios','editar-usuarios','asignar-roles',
+            'ver-reportes','generar-reportes','exportar-reportes',
+            'ver-configuracion','editar-configuracion',
+        ]);
+
+        // subadmin_evento: igual que admin_evento PERO SIN eliminar-eventos
+        $subadminEvento->syncPermissions([
+            'ver-eventos','crear-eventos','editar-eventos',
+            'aprobar-eventos','cancelar-eventos','duplicar-eventos',
+            'ver-opciones','elegir-opciones',
+            'ver-usuarios','crear-usuarios','editar-usuarios',
+            'ver-reportes','generar-reportes','exportar-reportes',
+            'ver-configuracion',
+        ]);
+
+        // invitado: acceso mínimo
+        $invitado->syncPermissions([
+            'ver-eventos',
+            'ver-opciones','elegir-opciones',
+        ]);
+
+        // Personas + Users demo (se crean primero como personas)
+        $seed = [
+            ['email' => 'superadmin@example.com', 'name' => 'Super Admin', 'role' => 'superadmin'],
+            ['email' => 'admin_evento@example.com', 'name' => 'Admin Evento', 'role' => 'admin_evento'],
+            ['email' => 'subadmin_evento@example.com', 'name' => 'Subadmin Evento', 'role' => 'subadmin_evento'],
+            ['email' => 'invitado@example.com', 'name' => 'Invitado', 'role' => 'invitado'],
+        ];
+
+        foreach ($seed as $s) {
+            // Persona primero
+            $persona = Persona::firstOrCreate(
+                ['email' => $s['email']],
+                [
+                    'nombre'   => $s['name'],
+                    'apellido' => '',
+                    'email'    => $s['email'],
+                ]
+            );
+
+            // User vinculado a persona
+            $user = User::firstOrCreate(
+                ['email' => $s['email']],
+                [
+                    'name'       => $s['name'],
+                    'password'   => bcrypt('password'),
+                    'persona_id' => $persona->id,
+                ]
+            );
+
+            if (!$user->persona_id) {
+                $user->update(['persona_id' => $persona->id]);
+            }
+
+            if (!$user->hasRole($s['role'])) {
+                $user->assignRole($s['role']);
+            }
+        }
     }
 }
