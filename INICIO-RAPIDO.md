@@ -2,7 +2,7 @@
 
 Guía rápida para iniciar el proyecto en menos de 5 minutos.
 
-## Prerequisitos
+## Prerrequisitos
 
 ✅ PHP 8.2+  
 ✅ Composer  

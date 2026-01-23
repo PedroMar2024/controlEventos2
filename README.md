@@ -242,9 +242,6 @@ php artisan test --filter NombreDelTest
 ```bash
 # Formatear código con Laravel Pint
 ./vendor/bin/pint
-
-# O usando composer
-composer pint
 ```
 
 ## Estructura del Proyecto
