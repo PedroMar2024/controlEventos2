@@ -42,89 +42,107 @@ class EventoController extends Controller
     }
 
     public function store(Request $request)
-    {
-        Log::debug('Eventos@store payload', $request->except('_token'));
+{
+    Log::debug('Eventos@store payload', $request->except('_token'));
 
-        try {
-            $data = $request->validate([
-                'nombre'        => ['required','string','max:255'],
-                'descripcion'   => ['nullable','string'],
-                'fecha_evento'  => ['nullable','date'],
-                'hora_inicio'   => ['nullable','date_format:H:i'],
-                'hora_cierre'   => ['nullable','date_format:H:i'],
-                'ubicacion'     => ['nullable','string','max:255'],
-                'localidad'     => ['nullable','string','max:255'],
-                'provincia'     => ['nullable','string','max:255'],
-                'capacidad'     => ['nullable','integer','min:1'],
-                'estado'        => ['nullable','in:pendiente,aprobado,finalizado'],
-                'precio_evento' => ['nullable','numeric','min:0'],
-                'publico'       => ['nullable','boolean'],
-                'reingreso'     => ['nullable','boolean'],
+    try {
+        $data = $request->validate([
+            'nombre'        => ['required','string','max:255'],
+            'descripcion'   => ['nullable','string'],
+            'fecha_evento'  => ['nullable','date'],
+            'hora_inicio'   => ['nullable','date_format:H:i'],
+            'hora_cierre'   => ['nullable','date_format:H:i'],
+            'ubicacion'     => ['nullable','string','max:255'],
+            'localidad'     => ['nullable','string','max:255'],
+            'provincia'     => ['nullable','string','max:255'],
+            // 'capacidad'   => ['nullable','integer','min:1'], // Derivada de tickets: QUITADA
+            'estado'        => ['nullable','in:pendiente,aprobado,finalizado'],
+            // 'precio_evento' => ['nullable','numeric','min:0'], // Deprecado: QUITADA
+            'publico'       => ['nullable','boolean'],
+            'reingreso'     => ['nullable','boolean'],
 
-                // Admin por email
-                'admin_email'   => ['required','email'],
-                'admin_nombre'  => ['nullable','string','max:255'],
-                'admin_dni'     => ['nullable','string','max:32'],
+            // Admin por email
+            'admin_email'   => ['required','email'],
+            'admin_nombre'  => ['nullable','string','max:255'],
+            'admin_dni'     => ['nullable','string','max:32'],
+
+            // Tickets (máximo 5)
+            'tickets'            => ['nullable','array','max:5'],
+            'tickets.*.id'       => ['nullable','integer'],
+            'tickets.*.nombre'   => ['nullable','string','max:100'],
+            'tickets.*.precio'   => ['nullable','numeric','min:0'],
+            'tickets.*.cupo'     => ['nullable','integer','min:0'],
+            'tickets.*.activo'   => ['nullable','boolean'],
+            'tickets.*._destroy' => ['nullable','boolean'],
+        ]);
+
+        // Persona admin por email
+        $adminPersona = Persona::where('email', $request->string('admin_email'))->first();
+        if (!$adminPersona) {
+            $request->validate([
+                'admin_nombre'  => ['required','string','max:255'],
+                'admin_dni'     => ['required','string','max:32'],
             ]);
 
-            // Persona admin por email
-            $adminPersona = Persona::where('email', $request->string('admin_email'))->first();
-            if (!$adminPersona) {
-                $request->validate([
-                    'admin_nombre'  => ['required','string','max:255'],
-                    'admin_dni'     => ['required','string','max:32'],
-                ]);
-
-                $adminPersona = Persona::create([
-                    'email'  => (string) $request->string('admin_email'),
-                    'nombre' => (string) $request->string('admin_nombre'),
-                    'dni'    => (string) $request->string('admin_dni'),
-                ]);
-            }
-
-            // Normalizar checkboxes
-            $data['publico']   = $request->boolean('publico');
-            $data['reingreso'] = $request->boolean('reingreso');
-
-            // Crear evento
-            $evento = new Evento();
-            foreach ($evento->getFillable() as $col) {
-                if (array_key_exists($col, $data)) {
-                    $evento->{$col} = $data[$col];
-                }
-            }
-            // Forzar provincia con lo que llega (evita que quede un valor previo o vacío)
-            $evento->provincia = $request->input('provincia');
-
-            $evento->admin_persona_id = $adminPersona->id;
-
-            Log::info('STORE provincia', [
-                'input' => $request->input('provincia'),
+            $adminPersona = Persona::create([
+                'email'  => (string) $request->string('admin_email'),
+                'nombre' => (string) $request->string('admin_nombre'),
+                'dni'    => (string) $request->string('admin_dni'),
             ]);
-
-            $evento->save();
-
-            Log::info('STORE provincia AFTER', [
-                'persisted' => $evento->provincia,
-            ]);
-
-            // Pivot rol admin
-            if (method_exists($evento, 'personas')) {
-                $evento->personas()->syncWithoutDetaching([
-                    $adminPersona->id => ['role' => 'admin']
-                ]);
-            }
-
-            return redirect()->route('eventos.index')->with('success', 'Evento creado correctamente.');
-        } catch (Throwable $e) {
-            Log::error('Error en Eventos@store', [
-                'error' => $e->getMessage(),
-                'file'  => $e->getFile(),
-                'line'  => $e->getLine(),
-            ]);
-            return back()->withInput()->withErrors(['app' => $e->getMessage()]);
         }
+
+        // Normalizar checkboxes
+        $data['publico']   = $request->boolean('publico');
+        $data['reingreso'] = $request->boolean('reingreso');
+
+        // Crear evento
+        $evento = new Evento();
+        foreach ($evento->getFillable() as $col) {
+            if (array_key_exists($col, $data)) {
+                $evento->{$col} = $data[$col];
+            }
+        }
+        // Forzar provincia con lo que llega (evita que quede un valor previo o vacío)
+        $evento->provincia = $request->input('provincia');
+
+        // Normaliza horas a H:i por si el browser envía con segundos
+        $evento->hora_inicio = $request->filled('hora_inicio') ? substr($request->input('hora_inicio'), 0, 5) : null;
+        $evento->hora_cierre = $request->filled('hora_cierre') ? substr($request->input('hora_cierre'), 0, 5) : null;
+
+        $evento->admin_persona_id = $adminPersona->id;
+
+        Log::info('STORE provincia', [
+            'input' => $request->input('provincia'),
+        ]);
+
+        $evento->save();
+
+        Log::info('STORE provincia AFTER', [
+            'persisted' => $evento->provincia,
+        ]);
+
+        // Pivot rol admin
+        if (method_exists($evento, 'personas')) {
+            $evento->personas()->syncWithoutDetaching([
+                $adminPersona->id => ['role' => 'admin']
+            ]);
+        }
+
+        // Sincroniza tickets y deriva capacidad
+        $this->syncTickets($evento, $request->input('tickets', []));
+        $evento->capacidad = $this->computeCapacityFromTickets($evento);
+        $evento->save();
+
+        return redirect()->route('eventos.index')->with('success', 'Evento creado correctamente.');
+    } catch (Throwable $e) {
+        Log::error('Error en Eventos@store', [
+            'error' => $e->getMessage(),
+            'file'  => $e->getFile(),
+            'line'  => $e->getLine(),
+        ]);
+        return back()->withInput()->withErrors(['app' => $e->getMessage()]);
     }
+}
 
     public function show($id)
     {
@@ -151,68 +169,85 @@ class EventoController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        Log::debug('Eventos@update payload', $request->except('_token'));
+{
+    Log::debug('Eventos@update payload', $request->except('_token'));
 
-        try {
-            $evento = Evento::findOrFail($id);
+    try {
+        $evento = Evento::findOrFail($id);
 
-            if (!auth()->user()->hasRole('superadmin')) {
-                Gate::authorize('editar-evento', $evento);
-            }
-
-            $validated = $request->validate([
-                'nombre'        => ['required','string','max:255'],
-                'descripcion'   => ['nullable','string'],
-                'fecha_evento'  => ['required','date'],
-                'hora_inicio'   => ['nullable','date_format:H:i'],
-                'hora_cierre'   => ['nullable','date_format:H:i'],
-                'ubicacion'     => ['nullable','string','max:255'],
-                'localidad'     => ['nullable','string','max:255'],
-                'provincia'     => ['nullable','string','max:255'],
-                'capacidad'     => ['nullable','integer','min:1'],
-                'estado'        => ['required','in:pendiente,aprobado,finalizado'],
-                'precio_evento' => ['nullable','numeric','min:0'],
-                'publico'       => ['boolean'],
-                'reingreso'     => ['nullable','boolean'],
-            ]);
-
-            $validated['publico']   = $request->boolean('publico');
-            $validated['reingreso'] = $request->boolean('reingreso');
-
-            foreach ($evento->getFillable() as $col) {
-                if (array_key_exists($col, $validated)) {
-                    $evento->{$col} = $validated[$col];
-                }
-            }
-
-            // Forzar provincia con lo que llega
-            $before = $evento->provincia;
-            $evento->provincia = $request->input('provincia');
-
-            Log::info('UPDATE provincia', [
-                'before' => $before,
-                'input'  => $request->input('provincia'),
-            ]);
-
-            $evento->save();
-
-            Log::info('UPDATE provincia AFTER', [
-                'after' => $evento->provincia,
-                'dirty' => $evento->getChanges(),
-            ]);
-
-            return redirect()->route('eventos.index')->with('success', 'Evento actualizado');
-        } catch (Throwable $e) {
-            Log::error('Error en Eventos@update', [
-                'error' => $e->getMessage(),
-                'file'  => $e->getFile(),
-                'line'  => $e->getLine(),
-            ]);
-            return back()->withInput()->withErrors(['app' => $e->getMessage()]);
+        if (!auth()->user()->hasRole('superadmin')) {
+            Gate::authorize('editar-evento', $evento);
         }
-    }
 
+        $validated = $request->validate([
+            'nombre'        => ['required','string','max:255'],
+            'descripcion'   => ['nullable','string'],
+            'fecha_evento'  => ['required','date'],
+            'hora_inicio'   => ['nullable','date_format:H:i'],
+            'hora_cierre'   => ['nullable','date_format:H:i'],
+            'ubicacion'     => ['nullable','string','max:255'],
+            'localidad'     => ['nullable','string','max:255'],
+            'provincia'     => ['nullable','string','max:255'],
+            // 'capacidad'   => ['nullable','integer','min:1'], // Derivada de tickets: QUITADA
+            'estado'        => ['required','in:pendiente,aprobado,finalizado'],
+            // 'precio_evento' => ['nullable','numeric','min:0'], // Deprecado: QUITADA
+            'publico'       => ['boolean'],
+            'reingreso'     => ['nullable','boolean'],
+
+            // Tickets (máximo 5)
+            'tickets'            => ['nullable','array','max:5'],
+            'tickets.*.id'       => ['nullable','integer'],
+            'tickets.*.nombre'   => ['nullable','string','max:100'],
+            'tickets.*.precio'   => ['nullable','numeric','min:0'],
+            'tickets.*.cupo'     => ['nullable','integer','min:0'],
+            'tickets.*.activo'   => ['nullable','boolean'],
+            'tickets.*._destroy' => ['nullable','boolean'],
+        ]);
+
+        $validated['publico']   = $request->boolean('publico');
+        $validated['reingreso'] = $request->boolean('reingreso');
+
+        foreach ($evento->getFillable() as $col) {
+            if (array_key_exists($col, $validated)) {
+                $evento->{$col} = $validated[$col];
+            }
+        }
+
+        // Forzar provincia con lo que llega
+        $before = $evento->provincia;
+        $evento->provincia = $request->input('provincia');
+
+        // Normaliza horas a H:i
+        $evento->hora_inicio = $request->filled('hora_inicio') ? substr($request->input('hora_inicio'), 0, 5) : null;
+        $evento->hora_cierre = $request->filled('hora_cierre') ? substr($request->input('hora_cierre'), 0, 5) : null;
+
+        Log::info('UPDATE provincia', [
+            'before' => $before,
+            'input'  => $request->input('provincia'),
+        ]);
+
+        $evento->save();
+
+        Log::info('UPDATE provincia AFTER', [
+            'after' => $evento->provincia,
+            'dirty' => $evento->getChanges(),
+        ]);
+
+        // Sincroniza tickets y deriva capacidad
+        $this->syncTickets($evento, $request->input('tickets', []));
+        $evento->capacidad = $this->computeCapacityFromTickets($evento);
+        $evento->save();
+
+        return redirect()->route('eventos.index')->with('success', 'Evento actualizado');
+    } catch (Throwable $e) {
+        Log::error('Error en Eventos@update', [
+            'error' => $e->getMessage(),
+            'file'  => $e->getFile(),
+            'line'  => $e->getLine(),
+        ]);
+        return back()->withInput()->withErrors(['app' => $e->getMessage()]);
+    }
+}
     public function destroy($id)
     {
         $evento = Evento::findOrFail($id);
@@ -249,4 +284,54 @@ class EventoController extends Controller
 
         return redirect()->route('eventos.index')->with('success', 'Evento marcado como pendiente');
     }
+    private function syncTickets(Evento $evento, array $tickets): void
+{
+    $rows = collect($tickets ?? [])
+        ->filter(fn($t) => empty($t['_destroy']))
+        ->filter(fn($t) => isset($t['nombre']) && trim($t['nombre']) !== '');
+
+    // nombres duplicados en la misma petición no permitidos
+    $names = $rows->map(fn($t) => strtolower(trim($t['nombre'])));
+    if ($names->count() !== $names->unique()->count()) {
+        abort(422, 'No se permiten nombres de entrada duplicados.');
+    }
+
+    foreach ($tickets ?? [] as $t) {
+        $destroy = !empty($t['_destroy']);
+        $id      = $t['id'] ?? null;
+
+        if ($id && $destroy) {
+            \App\Models\EventoTicket::where('evento_id', $evento->id)->where('id', $id)->delete();
+            continue;
+        }
+
+        if ($id && !$destroy) {
+            \App\Models\EventoTicket::where('evento_id', $evento->id)->where('id', $id)->update([
+                'nombre' => $t['nombre'] ?? '',
+                'precio' => isset($t['precio']) ? (float)$t['precio'] : 0,
+                'cupo'   => isset($t['cupo']) ? (int)$t['cupo'] : null,
+                'activo' => !empty($t['activo']),
+            ]);
+            continue;
+        }
+
+        if (!$id && !$destroy && isset($t['nombre']) && trim($t['nombre']) !== '') {
+            \App\Models\EventoTicket::create([
+                'evento_id' => $evento->id,
+                'nombre'    => $t['nombre'],
+                'precio'    => isset($t['precio']) ? (float)$t['precio'] : 0,
+                'cupo'      => isset($t['cupo']) ? (int)$t['cupo'] : null,
+                'activo'    => !empty($t['activo']),
+            ]);
+        }
+    }
+}
+
+private function computeCapacityFromTickets(Evento $evento): int
+{
+    $evento->loadMissing('tickets');
+    return (int) $evento->tickets
+        ->where('activo', true)
+        ->sum(function ($t) { return (int)($t->cupo ?? 0); });
+}
 }

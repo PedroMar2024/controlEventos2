@@ -122,20 +122,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Capacidad</label>
-                            <input type="number" name="capacidad" value="{{ old('capacidad') }}" min="1"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('capacidad') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Precio del evento</label>
-                            <input type="number" step="0.01" name="precio_evento" value="{{ old('precio_evento') }}"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('precio_evento') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                    </div>
+                    {{-- Capacidad y precio del evento eliminados (capacidad se deriva de los tickets, precio por ticket) --}}
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="flex items-center">

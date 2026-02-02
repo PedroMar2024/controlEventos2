@@ -43,7 +43,7 @@ class Evento extends Model
 // NUEVO: relación con tipos de entrada
 public function tickets()
 {
-    return $this->hasMany(\App\Models\EventoTicket::class);
+    return $this->hasMany(\App\Models\EventoTicket::class, 'evento_id');
 }
     public function personas()
     {
