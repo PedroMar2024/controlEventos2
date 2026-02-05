@@ -25,15 +25,19 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('debug.roles');
 
+    // Cambiamos {id} -> {evento} para usar Route Model Binding con Policies
     Route::get('/eventos/create', [EventoController::class, 'create'])->name('eventos.create');
     Route::post('/eventos', [EventoController::class, 'store'])->name('eventos.store');
-    Route::get('/eventos/{id}', [EventoController::class, 'show'])->name('eventos.show');
-    Route::get('/eventos/{id}/edit', [EventoController::class, 'edit'])->name('eventos.edit');
-    Route::patch('/eventos/{id}', [EventoController::class, 'update'])->name('eventos.update');
-    Route::delete('/eventos/{id}', [EventoController::class, 'destroy'])->name('eventos.destroy');
+    Route::get('/eventos/{evento}', [EventoController::class, 'show'])->name('eventos.show');
+    Route::get('/eventos/{evento}/edit', [EventoController::class, 'edit'])->name('eventos.edit');
+    Route::patch('/eventos/{evento}', [EventoController::class, 'update'])->name('eventos.update');
+    Route::delete('/eventos/{evento}', [EventoController::class, 'destroy'])->name('eventos.destroy');
 
-    Route::post('/eventos/{id}/aprobar', [EventoController::class, 'aprobar'])->name('eventos.aprobar');
-    Route::post('/eventos/{id}/cancelar', [EventoController::class, 'cancelar'])->name('eventos.cancelar');
+    // Acciones de estado protegidas por Policy (superadmin via before)
+    Route::post('/eventos/{evento}/aprobar', [EventoController::class, 'aprobar'])
+        ->middleware('can:approve,evento')->name('eventos.aprobar');
+    Route::post('/eventos/{evento}/cancelar', [EventoController::class, 'cancelar'])
+        ->middleware('can:cancel,evento')->name('eventos.cancelar');
 });
 
 require __DIR__.'/auth.php';

@@ -3,37 +3,22 @@
 namespace App\Providers;
 
 use App\Models\Evento;
+use App\Policies\EventoPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
-use Illuminate\Support\Facades\Gate;
 
 class AuthServiceProvider extends ServiceProvider
 {
+    // Registra la Policy de Evento
     protected $policies = [
-        // Evento::class => \App\Policies\EventoPolicy::class, // si luego usas policies
+        \App\Models\Evento::class => \App\Policies\EventoPolicy::class,
     ];
 
     public function boot(): void
     {
+        // Carga todas las policies registradas
         $this->registerPolicies();
 
-        // Regla global: superadmin pasa cualquier autorización
-        Gate::before(function ($user, $ability) {
-            return $user->hasRole('superadmin') ? true : null;
-        });
-
-        // Gates mínimos (para no-superadmin), opcional:
-        Gate::define('ver-evento', function ($user, Evento $evento) {
-            if ($evento->publico) return true;
-            $pid = $user->persona?->id;
-            if (!$pid) return false;
-
-            return $evento->personas()
-                ->wherePivotIn('role', ['admin','subadmin'])
-                ->where('personas.id', $pid)
-                ->exists();
-        });
-
-        Gate::define('editar-evento', fn($user, Evento $evento) => Gate::check('ver-evento', $evento));
-        Gate::define('eliminar-evento', fn($user, Evento $evento) => Gate::check('editar-evento', $evento));
+        // No definas Gates aquí para Evento: la autorización se maneja en EventoPolicy.
+        // El bypass de superadmin también queda cubierto por el método before() de la Policy.
     }
 }

@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+use App\Models\User;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class EventoController extends Controller
 {
@@ -17,23 +20,25 @@ class EventoController extends Controller
     }
 
     public function index()
-    {
-        $user = auth()->user();
+{
+    $user = auth()->user();
 
-        if ($user->hasRole('superadmin')) {
-            $eventos = Evento::orderBy('fecha_evento','desc')->paginate(15);
-        } else {
-            $personaId = optional($user->persona)->id;
-            $eventos = Evento::where('publico', true)
-                ->orWhereHas('personas', function ($q) use ($personaId) {
-                    $q->where('personas.id', $personaId);
-                })
-                ->orderBy('fecha_evento','desc')
-                ->paginate(15);
-        }
+    if ($user->hasRole('superadmin')) {
+        $eventos = Evento::orderBy('fecha_evento','desc')->paginate(15);
+    } else {
+        $personaId = optional($user->persona)->id;
 
-        return view('eventos.index', compact('eventos'));
+        // SOLO eventos donde el usuario está vinculado (admin o subadmin). Sin “publico”.
+        $eventos = Evento::whereHas('personas', function ($q) use ($personaId) {
+                $q->where('personas.id', $personaId)
+                  ->whereIn('event_persona_roles.role', ['admin','subadmin']);
+            })
+            ->orderBy('fecha_evento','desc')
+            ->paginate(15);
     }
+
+    return view('eventos.index', compact('eventos'));
+}
 
     public function create()
     {
@@ -90,7 +95,56 @@ class EventoController extends Controller
                 'dni'    => (string) $request->string('admin_dni'),
             ]);
         }
+            // Persona admin por email
+            $adminPersona = Persona::where('email', $request->string('admin_email'))->first();
+            if (!$adminPersona) {
+                $request->validate([
+                    'admin_nombre'  => ['required','string','max:255'],
+                    'admin_dni'     => ['required','string','max:32'],
+                ]);
 
+                $adminPersona = Persona::create([
+                    'email'  => (string) $request->string('admin_email'),
+                    'nombre' => (string) $request->string('admin_nombre'),
+                    'dni'    => (string) $request->string('admin_dni'),
+                ]);
+            }
+
+            /* === Bloque insertar aquí: asegurar cuenta y enviar email === */
+            $user = User::where('email', $adminPersona->email)->first();
+
+            if (!$user) {
+                // Crea el User con password aleatoria y lo vincula a Persona
+                $user = User::create([
+                    'name'       => $adminPersona->nombre ?: $adminPersona->email,
+                    'email'      => $adminPersona->email,
+                    'password'   => bcrypt(Str::random(32)),
+                    'persona_id' => $adminPersona->id,
+                ]);
+
+                // Envía el email con el link de "establecer contraseña"
+                $status = Password::sendResetLink(['email' => $user->email]);
+
+                \Log::info('Onboarding admin evento: reset link enviado', [
+                    'email'  => $user->email,
+                    'status' => $status,
+                ]);
+            } else {
+                // Asegura vínculo a Persona si faltara
+                if (!$user->persona_id) {
+                    $user->persona_id = $adminPersona->id;
+                    $user->save();
+                }
+                // Si querés forzar reenvío del link siempre, descomenta:
+                // Password::sendResetLink(['email' => $user->email]);
+            }
+            /* === Fin del bloque a insertar === */
+
+            // Normalizar checkboxes y continuar con la creación del Evento…
+            $data['publico']   = $request->boolean('publico');
+            $data['reingreso'] = $request->boolean('reingreso');
+
+            // ... resto de tu método store (crear $evento, guardar, pivot admin, tickets y capacidad)
         // Normalizar checkboxes
         $data['publico']   = $request->boolean('publico');
         $data['reingreso'] = $request->boolean('reingreso');
@@ -144,17 +198,12 @@ class EventoController extends Controller
     }
 }
 
-    public function show($id)
-    {
-        $evento = Evento::findOrFail($id);
-
-        // Si no es público y NO sos superadmin, chequea permiso
-        if (!$evento->publico && !auth()->user()->hasRole('superadmin')) {
-            Gate::authorize('ver-evento', $evento);
-        }
-
-        return view('eventos.show', compact('evento'));
-    }
+public function show(Evento $evento)
+{
+    $this->authorize('view', $evento);
+    $evento->load('tickets', 'adminPersona');
+    return view('eventos.show', compact('evento'));
+}
 
     public function edit($id)
     {
