@@ -39,5 +39,5 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/eventos/{evento}/cancelar', [EventoController::class, 'cancelar'])
         ->middleware('can:cancel,evento')->name('eventos.cancelar');
 });
-
+require __DIR__.'/eventos_equipo.php';
 require __DIR__.'/auth.php';

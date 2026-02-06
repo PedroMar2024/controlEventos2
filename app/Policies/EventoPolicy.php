@@ -7,6 +7,7 @@ use App\Models\User;
 
 class EventoPolicy
 {
+    // Superadmin pasa cualquier ability
     public function before(User $user, string $ability)
     {
         if ($user->hasRole('superadmin')) {
@@ -14,6 +15,7 @@ class EventoPolicy
         }
     }
 
+    // Helpers de identidad Persona y roles por evento (pivot)
     private function personaId(User $user): ?int
     {
         return optional($user->persona)->id;
@@ -41,31 +43,65 @@ class EventoPolicy
             ->exists();
     }
 
+    // Helpers de roles globales (Spatie)
+    private function esAdminGlobal(User $user): bool
+    {
+        return $user->hasRole('admin_evento');
+    }
+
+    private function esSubadminGlobal(User $user): bool
+    {
+        return $user->hasRole('subadmin_evento');
+    }
+
+    // Listado: el controlador filtra por pertenencia (admin/subadmin o público)
     public function viewAny(User $user): bool
     {
-        return true; // El controlador se encarga de filtrar la lista por pertenencia
+        return true;
     }
 
+    // Ver un evento: solo admin o subadmin del evento (público NO otorga acceso aquí)
     public function view(User $user, Evento $evento): bool
     {
-        // SOLO pertenencia (admin o subadmin). 'publico' NO otorga acceso.
         return $this->esAdminEvento($user, $evento) || $this->esSubadminEvento($user, $evento);
     }
 
-    public function create(User $user): bool { return false; }   // solo superadmin via before()
-    public function update(User $user, Evento $evento): bool { return false; }
-    public function delete(User $user, Evento $evento): bool { return false; }
+    // Crear evento: permitido al rol global admin_evento (y superadmin via before)
+    public function create(User $user): bool
+    {
+        return $this->esAdminGlobal($user);
+    }
 
+    // Actualizar evento: admin global o admin/subadmin del evento
+    public function update(User $user, Evento $evento): bool
+    {
+        return $this->esAdminGlobal($user)
+            || $this->esAdminEvento($user, $evento)
+            || $this->esSubadminEvento($user, $evento);
+    }
+
+    // Eliminar evento: admin global o admin del evento (subadmin NO puede)
+    public function delete(User $user, Evento $evento): bool
+    {
+        return $this->esAdminGlobal($user) || $this->esAdminEvento($user, $evento);
+    }
+
+    // Gestión de subadmins: admin del evento (o admin global)
     public function manageSubadmins(User $user, Evento $evento): bool
     {
-        return $this->esAdminEvento($user, $evento);
+        return $this->esAdminGlobal($user) || $this->esAdminEvento($user, $evento);
     }
 
+    // Gestión de invitados: admin/subadmin del evento (o roles globales equivalentes)
     public function manageGuests(User $user, Evento $evento): bool
     {
-        return $this->esAdminEvento($user, $evento) || $this->esSubadminEvento($user, $evento);
+        return $this->esAdminGlobal($user)
+            || $this->esSubadminGlobal($user)
+            || $this->esAdminEvento($user, $evento)
+            || $this->esSubadminEvento($user, $evento);
     }
 
+    // Aprobación / cancelación: solo superadmin (via before)
     public function approve(User $user, Evento $evento): bool { return false; }
     public function cancel(User $user, Evento $evento): bool { return false; }
 }

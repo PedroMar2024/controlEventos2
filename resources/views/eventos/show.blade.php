@@ -124,6 +124,15 @@
                  class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                 Editar evento
               </a>
+
+              {{-- NUEVO: Gestión de equipo (solo superadmin o admin del evento) --}}
+              @can('manageSubadmins', $evento)
+                <a href="{{ route('eventos.equipo.index', $evento) }}"
+                   class="inline-flex w-full items-center justify-center rounded-md bg-gray-800 px-3 py-2 text-sm font-medium text-white hover:bg-gray-900">
+                  Gestionar equipo
+                </a>
+              @endcan
+
               <a href="{{ route('eventos.index') }}"
                  class="inline-flex w-full items-center justify-center rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
                 Volver al listado
@@ -134,7 +143,7 @@
       </div>
 
       <!-- Pie con ID -->
-      <div class="px-6 py-4 border-t bg-white/70">
+      <div class="px-6 py-4 border-t bg:white/70">
         <div class="flex items-center justify-between">
           <p class="text-xs text-gray-500">ID Evento: {{ $evento->id }}</p>
           <p class="text-xs text-gray-500">Creado: {{ optional($evento->created_at)->format('d/m/Y H:i') }}</p>
