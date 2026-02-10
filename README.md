@@ -1,60 +1,341 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Control de Eventos
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de gestión de eventos desarrollado con Laravel 12, que permite administrar eventos, personas, tickets y roles.
 
-## About Laravel
+## Características
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- 🎫 Gestión de eventos
+- 👥 Gestión de personas y asistentes
+- 🎟️ Sistema de tickets para eventos
+- 🔐 Sistema de autenticación y autorización con roles
+- 📧 Notificaciones por correo
+- 🎨 Interfaz moderna con Tailwind CSS y Alpine.js
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requisitos Previos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Antes de comenzar, asegúrate de tener instalado en tu sistema:
 
-## Learning Laravel
+- **PHP** >= 8.2 ([Descargar PHP](https://www.php.net/downloads.php))
+- **Composer** >= 2.0 ([Descargar Composer](https://getcomposer.org/download/))
+- **Node.js** >= 18.0 y **npm** >= 9.0 ([Descargar Node.js](https://nodejs.org/))
+- **SQLite** (incluido por defecto en PHP) o **MySQL/PostgreSQL** (opcional)
+- **Git** ([Descargar Git](https://git-scm.com/downloads))
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Verificar instalaciones
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+php --version    # Debe mostrar PHP 8.2 o superior
+composer --version
+node --version   # Debe mostrar Node 18 o superior
+npm --version
+```
 
-## Laravel Sponsors
+## Instalación desde Cero
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Sigue estos pasos para configurar el proyecto en tu máquina local:
 
-### Premium Partners
+### 1. Clonar el repositorio
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+git clone https://github.com/PedroMar2024/controlEventos2.git
+cd controlEventos2
+```
 
-## Contributing
+### 2. Instalar dependencias de PHP
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+composer install
+```
 
-## Code of Conduct
+Este comando instalará todas las dependencias de PHP definidas en `composer.json`, incluyendo:
+- Laravel Framework 12
+- Laravel Breeze (autenticación)
+- Spatie Laravel Permission (roles y permisos)
+- Y más...
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 3. Instalar dependencias de JavaScript
 
-## Security Vulnerabilities
+```bash
+npm install
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Este comando instalará:
+- Vite (bundler de assets)
+- Tailwind CSS
+- Alpine.js
+- Y otras dependencias frontend
 
-## License
+### 4. Configurar el archivo de entorno
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-# trigger deploy
+Copia el archivo de ejemplo de configuración:
+
+```bash
+cp .env.example .env
+```
+
+Edita el archivo `.env` si necesitas personalizar alguna configuración (por defecto usa SQLite):
+
+```env
+APP_NAME="Control de Eventos"
+APP_ENV=local
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=sqlite
+# Para usar MySQL/PostgreSQL, descomenta y configura:
+# DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=control_eventos
+# DB_USERNAME=root
+# DB_PASSWORD=
+```
+
+### 5. Generar la clave de la aplicación
+
+```bash
+php artisan key:generate
+```
+
+Este comando genera una clave de cifrado única para tu aplicación.
+
+### 6. Crear la base de datos
+
+Si usas SQLite (configuración por defecto):
+
+```bash
+touch database/database.sqlite
+```
+
+Si usas MySQL o PostgreSQL, crea la base de datos manualmente:
+
+```bash
+# Para MySQL
+mysql -u root -p
+CREATE DATABASE control_eventos;
+exit;
+```
+
+### 7. Ejecutar las migraciones
+
+```bash
+php artisan migrate
+```
+
+Este comando creará todas las tablas necesarias:
+- users (usuarios)
+- personas (personas/asistentes)
+- eventos (eventos)
+- evento_tickets (tickets de eventos)
+- event_persona_roles (roles de personas en eventos)
+- permissions y roles (sistema de permisos)
+- cache, jobs, sessions (tablas del sistema)
+
+### 8. (Opcional) Ejecutar los seeders
+
+Si el proyecto tiene datos de prueba:
+
+```bash
+php artisan db:seed
+```
+
+### 9. Compilar los assets
+
+Para desarrollo:
+
+```bash
+npm run dev
+```
+
+Para producción:
+
+```bash
+npm run build
+```
+
+### 10. Configurar permisos de almacenamiento
+
+```bash
+php artisan storage:link
+chmod -R 775 storage bootstrap/cache
+```
+
+## Ejecutar la Aplicación
+
+### Método 1: Usando el script de desarrollo (Recomendado)
+
+Este comando inicia todos los servicios necesarios en paralelo:
+
+```bash
+composer dev
+```
+
+Esto iniciará:
+- Servidor web en http://localhost:8000
+- Cola de trabajos (queue worker)
+- Monitor de logs (Pail)
+- Compilador de assets (Vite)
+
+### Método 2: Usando comandos individuales
+
+En terminales separadas, ejecuta:
+
+**Terminal 1 - Servidor web:**
+```bash
+php artisan serve
+```
+
+**Terminal 2 - Compilador de assets:**
+```bash
+npm run dev
+```
+
+**Terminal 3 (opcional) - Cola de trabajos:**
+```bash
+php artisan queue:work
+```
+
+### Acceder a la aplicación
+
+Abre tu navegador y visita:
+- **Aplicación:** http://localhost:8000
+- **Registro/Login:** http://localhost:8000/register
+
+## Comandos Útiles
+
+### Desarrollo
+
+```bash
+# Limpiar cachés
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+
+# Ver rutas disponibles
+php artisan route:list
+
+# Crear un nuevo controlador
+php artisan make:controller NombreController
+
+# Crear un nuevo modelo con migración
+php artisan make:model Nombre -m
+
+# Crear un seeder
+php artisan make:seeder NombreSeeder
+```
+
+### Testing
+
+```bash
+# Ejecutar todos los tests
+composer test
+
+# O directamente con artisan
+php artisan test
+
+# Ejecutar un test específico
+php artisan test --filter NombreDelTest
+```
+
+### Formato de código
+
+```bash
+# Formatear código con Laravel Pint
+./vendor/bin/pint
+```
+
+## Estructura del Proyecto
+
+```
+controlEventos2/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/     # Controladores
+│   │   │   ├── EventoController.php
+│   │   │   ├── PersonaController.php
+│   │   │   └── ...
+│   │   └── Requests/        # Validaciones
+│   ├── Models/              # Modelos Eloquent
+│   │   ├── Evento.php
+│   │   ├── Persona.php
+│   │   ├── EventoTicket.php
+│   │   └── User.php
+│   └── Policies/            # Políticas de autorización
+├── database/
+│   ├── migrations/          # Migraciones de base de datos
+│   └── seeders/             # Datos de prueba
+├── resources/
+│   ├── views/               # Plantillas Blade
+│   └── js/                  # JavaScript/Alpine.js
+├── routes/
+│   ├── web.php              # Rutas web
+│   └── auth.php             # Rutas de autenticación
+├── public/                  # Archivos públicos
+├── storage/                 # Almacenamiento
+└── tests/                   # Tests automatizados
+```
+
+## Solución de Problemas
+
+### Error: "No application encryption key has been specified"
+
+```bash
+php artisan key:generate
+```
+
+### Error de permisos en storage/
+
+```bash
+chmod -R 775 storage bootstrap/cache
+# En Linux/Mac, también:
+sudo chown -R $USER:www-data storage bootstrap/cache
+```
+
+### Error: "SQLSTATE[HY000] [14] unable to open database file"
+
+```bash
+# Crea el archivo de base de datos
+touch database/database.sqlite
+# Dale permisos
+chmod 664 database/database.sqlite
+```
+
+### Los assets no se compilan
+
+```bash
+# Limpia la caché de npm
+npm cache clean --force
+# Reinstala dependencias
+rm -rf node_modules package-lock.json
+npm install
+npm run dev
+```
+
+### Puerto 8000 ya en uso
+
+```bash
+# Usa otro puerto
+php artisan serve --port=8001
+```
+
+## Tecnologías Utilizadas
+
+- **Backend:** Laravel 12 (PHP 8.2+)
+- **Frontend:** Blade, Tailwind CSS, Alpine.js
+- **Base de datos:** SQLite (desarrollo) / MySQL/PostgreSQL (producción)
+- **Autenticación:** Laravel Breeze
+- **Permisos:** Spatie Laravel Permission
+- **Build tool:** Vite
+- **Testing:** PHPUnit
+
+## Contribuir
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## Licencia
+
+Este proyecto es de código abierto bajo la licencia MIT.
