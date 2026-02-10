@@ -27,6 +27,24 @@ jobs:
           composer install --no-dev --prefer-dist --no-interaction --no-progress
           composer dump-autoload -o
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build frontend (Vite)
+        run: |
+          npm ci
+          npm run build
+
+      # Copia uploads a public/storage en vez de symlink (hosting compartido)
+      - name: Prepare public storage (copy uploads)
+        run: |
+          rm -rf public/storage
+          mkdir -p public/storage
+          cp -r storage/app/public/* public/storage/ || true
+
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@4.0.0
         with:
@@ -34,10 +52,15 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
-          local-dir: ./                 # sube todo desde el repo
-          server-dir: ./                # sube al home del usuario FTP; no duplica public_html
-          # Si querés limpiar el remoto ANTES de subir (evita duplicados y basura), activá:
-          # dangerous-clean-slate: true
+
+          # Si usas el usuario FTP dedicado que apunta a /home/c7525/public_html/controlDeEventos/:
+          # server-dir: ./   # raíz del usuario
+          # Si usas el usuario principal c7525 (raíz /home/c7525/), usa:
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}  # ej: /public_html/controlDeEventos/
+
+          local-dir: ./               # envía el proyecto ya compilado
+          # NO borrar el remoto para preservar .env y otros archivos manuales
+          dangerous-clean-slate: false
           exclude: |
             .git/**
             .github/**
@@ -50,9 +73,9 @@ jobs:
             storage/framework/sessions/**
             storage/framework/views/**
             vendor/bin/**
-            composer.lock
+            **/*.map
 
-      # Migraciones desactivadas por defecto. Solo corre si activás ENABLE_MIGRATIONS=true.
+      # Migraciones por HTTP (opcional). Requiere endpoint en tu app.
       - name: Run migrations (HTTP trigger)
         env:
           MIGRATE_URL: ${{ secrets.MIGRATE_URL }}

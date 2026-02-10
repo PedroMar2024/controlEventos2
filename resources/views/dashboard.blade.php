@@ -5,7 +5,7 @@
 @section('content')
     @php
         $user = auth()->user();
-        $globalRoles = $user->getRoleNames()->join(', '); // solo superadmin, si lo tienes
+        $globalRoles = $user->getRoleNames()->join(', ');
         $personaId = optional($user->persona)->id;
 
         // Eventos por rol (pivote event_persona_roles)
@@ -36,7 +36,11 @@
             ->orderBy('fecha_evento','desc')
             ->get();
 
+        // NUEVO: todos los eventos para superadmin (máximo 15 para vista)
         $esSuperadmin = $user->hasRole('superadmin');
+        $eventosTodos = $esSuperadmin
+            ? \App\Models\Evento::orderBy('fecha_evento','desc')->limit(15)->get()
+            : collect();
 
         // Colores para los badges de rol
         $badge = [
@@ -56,6 +60,54 @@
                 Rol global: {{ $globalRoles ?: '—' }}
             </p>
         </div>
+
+        {{-- NUEVO: sección para superadmin con todos los eventos --}}
+        @if($esSuperadmin)
+        <div class="rounded-lg bg-white shadow p-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-semibold">Todos los eventos (Superadmin)</h3>
+                <a href="{{ route('eventos.index') }}"
+                   class="text-sm px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
+                    Gestionar Eventos
+                </a>
+            </div>
+            @if($eventosTodos->isEmpty())
+                <p class="mt-2 text-sm text-gray-500">No hay eventos creados aún.</p>
+            @else
+                <ul class="mt-3 space-y-2">
+                    @foreach($eventosTodos as $ev)
+                        <li class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium">{{ $ev->nombre }}</span>
+                                <span class="ml-2 text-xs text-gray-500">({{ ucfirst($ev->estado ?? 'pendiente') }})</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <a href="{{ route('eventos.show', $ev->id) }}"
+                                   class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                                <a href="{{ route('eventos.edit', $ev->id) }}"
+                                   class="text-sm px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                                <!-- Acciones protegidas por Policy (superadmin pasa via before) -->
+                                <form method="POST" action="{{ route('eventos.aprobar', $ev->id) }}">
+                                    @csrf
+                                    <button type="submit"
+                                            class="text-sm px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700">
+                                        Aprobar
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('eventos.cancelar', $ev->id) }}">
+                                    @csrf
+                                    <button type="submit"
+                                            class="text-sm px-2 py-1 rounded bg-yellow-600 text-white hover:bg-yellow-700">
+                                        Cancelar
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+        @endif
 
         @if($esSuperadmin || $eventosAdmin->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
@@ -117,8 +169,6 @@
                                 <a href="{{ route('eventos.show', $ev->id) }}"
                                    class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
                                 {{-- Acciones propias de subadmin (si existen) --}}
-                                {{-- <a href="{{ route('eventos.guests', $ev->id) }}"
-                                   class="text-sm px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">Invitados</a> --}}
                             </div>
                         </li>
                     @endforeach
