@@ -56,7 +56,7 @@ jobs:
           # Si usas el usuario FTP dedicado que apunta a /home/c7525/public_html/controlDeEventos/:
           # server-dir: ./   # raíz del usuario
           # Si usas el usuario principal c7525 (raíz /home/c7525/), usa:
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}  # ej: /public_html/controlDeEventos/
+          server-dir: ./      
 
           local-dir: ./               # envía el proyecto ya compilado
           # NO borrar el remoto para preservar .env y otros archivos manuales
