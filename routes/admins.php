@@ -8,7 +8,14 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('role:superadmin')
         ->name('admins.index');
 
-    // Ver eventos de un admin de eventos
+    Route::get('/admins/create', [AdminManagementController::class, 'create'])
+        ->middleware('role:superadmin')
+        ->name('admins.create');
+
+    Route::post('/admins', [AdminManagementController::class, 'store'])
+        ->middleware('role:superadmin')
+        ->name('admins.store');
+
     Route::get('/admins/{user}/events', [AdminManagementController::class, 'events'])
         ->middleware('role:superadmin')
         ->name('admins.events');

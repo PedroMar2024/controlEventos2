@@ -51,6 +51,11 @@
 
         $fmtFecha = fn($ev) => optional($ev->fecha_evento)->format('d/m/Y') ?: '—';
         $fmtEstado = fn($ev) => ucfirst($ev->estado ?? 'pendiente');
+        $estadoChip = function($ev) {
+            return $ev->estado === 'aprobado'
+                ? 'bg-green-100 text-green-700'
+                : ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700');
+        };
     @endphp
 
     <div class="grid grid-cols-1 gap-6">
@@ -64,19 +69,19 @@
             </p>
         </div>
 
-        {{-- Superadmin: todos los eventos (sin aprobar/cancelar) --}}
+        {{-- Superadmin: acceso rápido a administración de usuarios administradores y vista de todos los eventos --}}
         @if($esSuperadmin)
         <div class="rounded-lg bg-white shadow p-6">
             <div class="flex items-center justify-between">
-                <h3 class="text-base font-semibold">Todos los eventos (Superadmin)</h3>
-                <a href="{{ route('eventos.index') }}"
-                   class="text-sm px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
-                    Gestionar Eventos
+                <h3 class="text-base font-semibold">Panel de Superadmin</h3>
+                <a href="{{ route('admins.index') }}"
+                   class="text-sm px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                    Administradores
                 </a>
             </div>
 
             @if($eventosTodos->isEmpty())
-              <p class="mt-2 text-sm text-gray-500">No hay eventos creados aún.</p>
+              <p class="mt-3 text-sm text-gray-500">No hay eventos creados aún.</p>
             @else
               <div class="mt-3 overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -94,9 +99,7 @@
                         <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
                         <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
                         <td class="px-4 py-2 text-sm">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                            {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                               ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
                             {{ $fmtEstado($ev) }}
                           </span>
                         </td>
@@ -104,8 +107,10 @@
                           <div class="flex justify-end gap-2">
                             <a href="{{ route('eventos.show', $ev->id) }}"
                                class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                            {{-- Superadmin puede editar siempre --}}
                             <a href="{{ route('eventos.edit', $ev->id) }}"
                                class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                            {{-- Eliminación y aprobación/cancelación se gestionan desde vistas específicas; no en el dashboard --}}
                           </div>
                         </td>
                       </tr>
@@ -117,7 +122,7 @@
         </div>
         @endif
 
-        {{-- Admin --}}
+        {{-- Admin: sus eventos (tabla moderna), sin aprobar/cancelar, Editar solo si Policy lo permite --}}
         @if($esSuperadmin || $eventosAdmin->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
             <h3 class="text-base font-semibold">Eventos donde eres ADMIN</h3>
@@ -142,9 +147,7 @@
                         <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
                         <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
                         <td class="px-4 py-2 text-sm">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                            {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                               ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
                             {{ $fmtEstado($ev) }}
                           </span>
                         </td>
@@ -155,9 +158,10 @@
                           <div class="flex justify-end gap-2">
                             <a href="{{ route('eventos.show', $ev->id) }}"
                                class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
-                            <a href="{{ route('eventos.edit', $ev->id) }}"
-                               class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
-                            {{-- Removidos Aprobar/Cancelar --}}
+                            @can('update', $ev)
+                              <a href="{{ route('eventos.edit', $ev->id) }}"
+                                 class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                            @endcan
                           </div>
                         </td>
                       </tr>
@@ -169,7 +173,7 @@
         </div>
         @endif
 
-        {{-- Subadmin --}}
+        {{-- Subadmin: solo ver --}}
         @if($esSuperadmin || $eventosSubadmin->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
             <h3 class="text-base font-semibold">Eventos donde eres SUBADMIN</h3>
@@ -194,9 +198,7 @@
                         <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
                         <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
                         <td class="px-4 py-2 text-sm">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                            {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                               ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
                             {{ $fmtEstado($ev) }}
                           </span>
                         </td>
@@ -218,7 +220,7 @@
         </div>
         @endif
 
-        {{-- Invitado --}}
+        {{-- Invitado: solo ver --}}
         @if($eventosInvitado->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
             <h3 class="text-base font-semibold">Eventos donde eres INVITADO</h3>
@@ -239,9 +241,7 @@
                       <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
                       <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
                       <td class="px-4 py-2 text-sm">
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                          {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                             ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
                           {{ $fmtEstado($ev) }}
                         </span>
                       </td>

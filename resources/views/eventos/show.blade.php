@@ -122,10 +122,10 @@
 
             <div class="mt-6 space-y-2">
             @can('update', $evento)
-            <a href="{{ route('eventos.edit', $evento->id) }}"
-            class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            Editar evento
-          </a>
+                      <a href="{{ route('eventos.edit', $evento->id) }}"
+              class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              Editar evento
+            </a>
           @endcan
             
 
