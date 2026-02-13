@@ -20,6 +20,13 @@
                     <a href="{{ route('dashboard') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">Dashboard</a>
 
                     @auth
+                        {{-- Enlace solo para Superadmin: gestión de administradores --}}
+                        @role('superadmin')
+                        <a href="{{ route('admins.index') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+                            Administradores
+                        </a>
+                        @endrole
+
                         @hasanyrole('superadmin|admin_evento|subadmin_evento')
                             <a href="{{ route('eventos.index') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">
                                 Gestionar Eventos
@@ -60,6 +67,7 @@
     </header>
 
     <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        @include('partials.flash')
         @yield('content')
     </main>
 

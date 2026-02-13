@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class EquipoEventoController extends Controller
 {
@@ -27,7 +28,7 @@ class EquipoEventoController extends Controller
         return view('eventos.equipo', compact('evento', 'admin', 'subadmins', 'count'));
     }
 
-    // Agregar subadmin por email (crea Persona si no existe; crea User y envía reset password si no existe)
+    // Agregar subadmin por email (envía reset SOLO si el usuario es nuevo)
     public function store(Request $request, Evento $evento)
     {
         $data = $request->validate([
@@ -38,7 +39,7 @@ class EquipoEventoController extends Controller
         // Límite 10 subadmins
         $current = $evento->personas()->wherePivot('role', 'subadmin')->count();
         if ($current >= 10) {
-            return back()->withErrors(['limit' => 'Máximo 10 subadmins por evento.'])->withInput();
+            return back()->with('error', 'Máximo 10 subadmins por evento.')->withInput();
         }
 
         // Buscar o crear Persona
@@ -52,9 +53,29 @@ class EquipoEventoController extends Controller
             ->where('personas.id', $persona->id)
             ->wherePivot('role', 'subadmin')
             ->exists();
-
         if ($exists) {
-            return back()->withErrors(['duplicate' => 'Esta persona ya es subadmin del evento.'])->withInput();
+            return back()->with('error', 'Esta persona ya es subadmin del evento.')->withInput();
+        }
+
+        // Bloqueos:
+        // 1) el actor no puede agregarse a sí mismo
+        $actorPersonaId = optional(auth()->user()->persona)->id;
+        if ($actorPersonaId && $persona->id === $actorPersonaId) {
+            return back()->with('error', 'No podés agregarte a vos mismo como subadmin de este evento.')->withInput();
+        }
+
+        // 2) el admin del evento no puede ser subadmin
+        if ((int)$evento->admin_persona_id === (int)$persona->id) {
+            return back()->with('error', 'El admin del evento no puede ser agregado como subadmin.')->withInput();
+        }
+
+        // 3) si ya es admin en el pivot, no permitir subadmin
+        $esAdminPivot = $evento->personas()
+            ->where('personas.id', $persona->id)
+            ->wherePivot('role', 'admin')
+            ->exists();
+        if ($esAdminPivot) {
+            return back()->with('error', 'Esta persona ya es admin del evento.')->withInput();
         }
 
         DB::transaction(function () use ($evento, $persona, $data) {
@@ -63,21 +84,29 @@ class EquipoEventoController extends Controller
 
             // Asegurar User vinculado a Persona
             $user = User::where('email', $data['email'])->first();
+
             if (!$user) {
+                // Usuario nuevo: se crea y se envía reset
                 $user = User::create([
                     'name'       => $persona->nombre ?? $data['email'],
                     'email'      => $data['email'],
-                    'password'   => bcrypt(str()->random(12)), // temporal
+                    'password'   => bcrypt(Str::random(12)), // temporal
                     'persona_id' => $persona->id,
                 ]);
-            }
 
-            // Enviar link de reset de contraseña para que defina su password
-            $status = Password::sendResetLink(['email' => $data['email']]);
-            Log::info('EquipoEvento: sendResetLink', ['email' => $data['email'], 'status' => $status]);
+                $status = Password::sendResetLink(['email' => $user->email]);
+                Log::info('EquipoEvento: reset link enviado (usuario nuevo)', ['email' => $user->email, 'status' => $status]);
+            } else {
+                // Usuario existente: NO enviar reset. Solo asegurar vínculo de Persona si faltara.
+                if (!$user->persona_id) {
+                    $user->persona_id = $persona->id;
+                    $user->save();
+                }
+                Log::info('EquipoEvento: usuario existente, sin reset', ['email' => $user->email]);
+            }
         });
 
-        return back()->with('status', 'Subadmin agregado. Se envió email para definir su contraseña.');
+        return back()->with('status', 'Subadmin agregado.');
     }
 
     // Quitar subadmin del evento (elimina solo el rol subadmin en el pivot)

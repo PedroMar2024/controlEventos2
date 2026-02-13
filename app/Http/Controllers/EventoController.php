@@ -310,29 +310,22 @@ public function show(Evento $evento)
     }
 
     // Opcionales si existen en tus rutas:
-    public function aprobar($id)
+    public function aprobar(\App\Models\Evento $evento)
     {
-        $evento = Evento::findOrFail($id);
-        if (!auth()->user()->hasRole('superadmin')) {
-            Gate::authorize('editar-evento', $evento);
-        }
+        $this->authorize('approve', $evento);
         $evento->estado = 'aprobado';
         $evento->save();
-
         return redirect()->route('eventos.index')->with('success', 'Evento aprobado');
     }
-
-    public function cancelar($id)
+    
+    public function cancelar(\App\Models\Evento $evento)
     {
-        $evento = Evento::findOrFail($id);
-        if (!auth()->user()->hasRole('superadmin')) {
-            Gate::authorize('editar-evento', $evento);
-        }
+        $this->authorize('cancel', $evento);
         $evento->estado = 'pendiente';
         $evento->save();
-
         return redirect()->route('eventos.index')->with('success', 'Evento marcado como pendiente');
     }
+    
     private function syncTickets(Evento $evento, array $tickets): void
 {
     $rows = collect($tickets ?? [])

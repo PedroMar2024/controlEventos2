@@ -36,18 +36,21 @@
             ->orderBy('fecha_evento','desc')
             ->get();
 
-        // NUEVO: todos los eventos para superadmin (máximo 15 para vista)
+        // Todos los eventos para superadmin (máximo 15 para vista)
         $esSuperadmin = $user->hasRole('superadmin');
         $eventosTodos = $esSuperadmin
             ? \App\Models\Evento::orderBy('fecha_evento','desc')->limit(15)->get()
             : collect();
 
-        // Colores para los badges de rol
+        // Badges por rol
         $badge = [
             'admin'    => 'bg-emerald-100 text-emerald-700',
             'subadmin' => 'bg-indigo-100 text-indigo-700',
             'invitado' => 'bg-gray-100 text-gray-700',
         ];
+
+        $fmtFecha = fn($ev) => optional($ev->fecha_evento)->format('d/m/Y') ?: '—';
+        $fmtEstado = fn($ev) => ucfirst($ev->estado ?? 'pendiente');
     @endphp
 
     <div class="grid grid-cols-1 gap-6">
@@ -61,7 +64,7 @@
             </p>
         </div>
 
-        {{-- NUEVO: sección para superadmin con todos los eventos --}}
+        {{-- Superadmin: todos los eventos (sin aprobar/cancelar) --}}
         @if($esSuperadmin)
         <div class="rounded-lg bg-white shadow p-6">
             <div class="flex items-center justify-between">
@@ -71,128 +74,191 @@
                     Gestionar Eventos
                 </a>
             </div>
+
             @if($eventosTodos->isEmpty())
-                <p class="mt-2 text-sm text-gray-500">No hay eventos creados aún.</p>
+              <p class="mt-2 text-sm text-gray-500">No hay eventos creados aún.</p>
             @else
-                <ul class="mt-3 space-y-2">
+              <div class="mt-3 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($eventosTodos as $ev)
-                        <li class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ $ev->nombre }}</span>
-                                <span class="ml-2 text-xs text-gray-500">({{ ucfirst($ev->estado ?? 'pendiente') }})</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <a href="{{ route('eventos.show', $ev->id) }}"
-                                   class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
-                                <a href="{{ route('eventos.edit', $ev->id) }}"
-                                   class="text-sm px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
-                                <!-- Acciones protegidas por Policy (superadmin pasa via before) -->
-                                <form method="POST" action="{{ route('eventos.aprobar', $ev->id) }}">
-                                    @csrf
-                                    <button type="submit"
-                                            class="text-sm px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700">
-                                        Aprobar
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ route('eventos.cancelar', $ev->id) }}">
-                                    @csrf
-                                    <button type="submit"
-                                            class="text-sm px-2 py-1 rounded bg-yellow-600 text-white hover:bg-yellow-700">
-                                        Cancelar
-                                    </button>
-                                </form>
-                            </div>
-                        </li>
+                      <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                            {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                               ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                            {{ $fmtEstado($ev) }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <div class="flex justify-end gap-2">
+                            <a href="{{ route('eventos.show', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                            <a href="{{ route('eventos.edit', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                          </div>
+                        </td>
+                      </tr>
                     @endforeach
-                </ul>
+                  </tbody>
+                </table>
+              </div>
             @endif
         </div>
         @endif
 
+        {{-- Admin --}}
         @if($esSuperadmin || $eventosAdmin->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
             <h3 class="text-base font-semibold">Eventos donde eres ADMIN</h3>
+
             @if($eventosAdmin->isEmpty())
-                <p class="mt-2 text-sm text-gray-500">No tienes eventos como admin.</p>
+              <p class="mt-2 text-sm text-gray-500">No tienes eventos como admin.</p>
             @else
-                <ul class="mt-3 space-y-2">
+              <div class="mt-3 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($eventosAdmin as $ev)
-                        <li class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ $ev->nombre }}</span>
-                                <span class="ml-2 text-xs text-gray-500">({{ ucfirst($ev->estado ?? 'pendiente') }})</span>
-                                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium {{ $badge['admin'] }}">Admin</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <a href="{{ route('eventos.show', $ev->id) }}"
-                                   class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
-                                <a href="{{ route('eventos.edit', $ev->id) }}"
-                                   class="text-sm px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
-                                <!-- Las siguientes acciones pasan por Policy -->
-                                <form method="POST" action="{{ route('eventos.aprobar', $ev->id) }}">
-                                    @csrf
-                                    <button type="submit"
-                                            class="text-sm px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700">
-                                        Aprobar
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ route('eventos.cancelar', $ev->id) }}">
-                                    @csrf
-                                    <button type="submit"
-                                            class="text-sm px-2 py-1 rounded bg-yellow-600 text-white hover:bg-yellow-700">
-                                        Cancelar
-                                    </button>
-                                </form>
-                            </div>
-                        </li>
+                      <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                            {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                               ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                            {{ $fmtEstado($ev) }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $badge['admin'] }}">Admin</span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <div class="flex justify-end gap-2">
+                            <a href="{{ route('eventos.show', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                            <a href="{{ route('eventos.edit', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                            {{-- Removidos Aprobar/Cancelar --}}
+                          </div>
+                        </td>
+                      </tr>
                     @endforeach
-                </ul>
+                  </tbody>
+                </table>
+              </div>
             @endif
         </div>
         @endif
 
+        {{-- Subadmin --}}
         @if($esSuperadmin || $eventosSubadmin->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
             <h3 class="text-base font-semibold">Eventos donde eres SUBADMIN</h3>
+
             @if($eventosSubadmin->isEmpty())
-                <p class="mt-2 text-sm text-gray-500">No tienes eventos como subadmin.</p>
+              <p class="mt-2 text-sm text-gray-500">No tienes eventos como subadmin.</p>
             @else
-                <ul class="mt-3 space-y-2">
+              <div class="mt-3 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($eventosSubadmin as $ev)
-                        <li class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ $ev->nombre }}</span>
-                                <span class="ml-2 text-xs text-gray-500">({{ ucfirst($ev->estado ?? 'pendiente') }})</span>
-                                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium {{ $badge['subadmin'] }}">Subadmin</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <a href="{{ route('eventos.show', $ev->id) }}"
-                                   class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
-                                {{-- Acciones propias de subadmin (si existen) --}}
-                            </div>
-                        </li>
+                      <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                            {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                               ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                            {{ $fmtEstado($ev) }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $badge['subadmin'] }}">Subadmin</span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <div class="flex justify-end gap-2">
+                            <a href="{{ route('eventos.show', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                          </div>
+                        </td>
+                      </tr>
                     @endforeach
-                </ul>
+                  </tbody>
+                </table>
+              </div>
             @endif
         </div>
         @endif
 
+        {{-- Invitado --}}
         @if($eventosInvitado->isNotEmpty())
         <div class="rounded-lg bg-white shadow p-6">
             <h3 class="text-base font-semibold">Eventos donde eres INVITADO</h3>
-            <ul class="mt-3 space-y-2">
-                @foreach($eventosInvitado as $ev)
-                    <li class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="font-medium">{{ $ev->nombre }}</span>
-                            <span class="ml-2 text-xs text-gray-500">({{ ucfirst($ev->estado ?? 'pendiente') }})</span>
-                            <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium {{ $badge['invitado'] }}">Invitado</span>
+            <div class="mt-3 overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  @foreach($eventosInvitado as $ev)
+                    <tr>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                      <td class="px-4 py-2 text-sm">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                          {{ $ev->estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                             ($ev->estado === 'finalizado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700') }}">
+                          {{ $fmtEstado($ev) }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-2 text-sm">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $badge['invitado'] }}">Invitado</span>
+                      </td>
+                      <td class="px-4 py-2 text-sm">
+                        <div class="flex justify-end gap-2">
+                          <a href="{{ route('eventos.show', $ev->id) }}"
+                             class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
                         </div>
-                        <a href="{{ route('eventos.show', $ev->id) }}"
-                           class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
-                    </li>
-                @endforeach
-            </ul>
+                      </td>
+                    </tr>
+                  @endforeach
+                </tbody>
+              </table>
+            </div>
         </div>
         @endif
     </div>

@@ -8,11 +8,11 @@
     $inicio  = $evento->hora_inicio ? substr($evento->hora_inicio, 0, 5) : '—';
     $cierre  = $evento->hora_cierre ? substr($evento->hora_cierre, 0, 5) : '—';
     $estado  = ucfirst($evento->estado ?? 'pendiente');
-    $publico = $evento->publico ? 'Público' : 'Privado';
+    // $publico = $evento->publico ? 'Público' : 'Privado';   // REMOVIDO: no aplica al sistema
     $reing   = $evento->reingreso ? 'Con reingreso' : 'Sin reingreso';
     $admin   = optional($evento->adminPersona);
 
-    // NUEVO: tickets y capacidad derivada
+    // Tickets y capacidad derivada
     $tickets = $evento->tickets ?? collect();
     $capacidadDerivada = $tickets->where('activo', true)->sum(fn($t) => (int)($t->cupo ?? 0));
   @endphp
@@ -61,16 +61,15 @@
               <p class="text-base font-semibold text-gray-900">{{ $evento->ubicacion ?: '—' }}</p>
             </div>
             <div>
-              <!-- CAMBIO: capacidad derivada -->
               <p class="text-xs uppercase tracking-wide text-gray-500">Capacidad (derivada)</p>
               <p class="text-base font-semibold text-gray-900">{{ $capacidadDerivada }}</p>
             </div>
           </div>
 
           <div class="flex flex-wrap gap-2 mt-2">
-            <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{{ $publico }}</span>
+            {{-- REMOVIDO: Público/Privado --}}
+            {{-- <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{{ $publico }}</span> --}}
             <span class="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">{{ $reing }}</span>
-            <!-- QUITADO: chip de precio_evento -->
           </div>
 
           <!-- Tipos de entrada -->
@@ -109,23 +108,27 @@
             <p class="text-sm font-semibold text-gray-900">
               {{ $admin?->nombre ?: '—' }}
             </p>
-            <p class="text-xs text-gray-600">{{ $admin?->email }}</p>
+            {{-- REMOVIDO: email y DNI del admin --}}
+            {{-- <p class="text-xs text-gray-600">{{ $admin?->email }}</p>
             @if($admin && $admin->dni)
               <p class="text-xs text-gray-600">DNI {{ $admin->dni }}</p>
-            @endif
+            @endif --}}
 
-            <div class="mt-4">
+            {{-- REMOVIDO: bloque de Estado en lateral (ya aparece arriba) --}}
+            {{-- <div class="mt-4">
               <p class="text-xs uppercase tracking-wide text-gray-500">Estado</p>
               <p class="text-sm font-semibold text-gray-900">{{ $estado }}</p>
-            </div>
+            </div> --}}
 
             <div class="mt-6 space-y-2">
-              <a href="{{ route('eventos.edit', $evento->id) }}"
-                 class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                Editar evento
-              </a>
+            @can('update', $evento)
+            <a href="{{ route('eventos.edit', $evento->id) }}"
+            class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            Editar evento
+          </a>
+          @endcan
+            
 
-              {{-- NUEVO: Gestión de equipo (solo superadmin o admin del evento) --}}
               @can('manageSubadmins', $evento)
                 <a href="{{ route('eventos.equipo.index', $evento) }}"
                    class="inline-flex w-full items-center justify-center rounded-md bg-gray-800 px-3 py-2 text-sm font-medium text-white hover:bg-gray-900">

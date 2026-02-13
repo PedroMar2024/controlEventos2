@@ -75,15 +75,17 @@ class EventoPolicy
     // Actualizar evento: admin global o admin/subadmin del evento
     public function update(User $user, Evento $evento): bool
     {
-        return $this->esAdminGlobal($user)
-            || $this->esAdminEvento($user, $evento)
-            || $this->esSubadminEvento($user, $evento);
+        // superadmin siempre (también pasa por before())
+        if ($user->hasRole('superadmin')) return true;
+    
+        // admin del evento: solo si está pendiente
+        return $evento->estado === 'pendiente' && $this->esAdminEvento($user, $evento);
     }
-
-    // Eliminar evento: admin global o admin del evento (subadmin NO puede)
+    
     public function delete(User $user, Evento $evento): bool
     {
-        return $this->esAdminGlobal($user) || $this->esAdminEvento($user, $evento);
+        // Solo superadmin, y NO si está aprobado (en curso/publicado)
+        return $user->hasRole('superadmin') && $evento->estado !== 'aprobado';
     }
 
     // Gestión de subadmins: admin del evento (o admin global)
