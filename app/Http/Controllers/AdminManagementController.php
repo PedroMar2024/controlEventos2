@@ -57,4 +57,55 @@ class AdminManagementController extends Controller
 
         return redirect()->route('admins.index')->with('status', 'Administrador creado. Se envió email de reseteo.');
     }
+    
+    public function edit(User $user)
+{
+    return view('admins.edit', compact('user'));
+}
+ 
+public function update(Request $request, User $user)
+{
+    $data = $request->validate([
+        'name'  => ['required', 'string', 'max:255'],
+        'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
+        'password' => ['nullable', 'string', 'min:8'],
+    ]);
+
+    $user->name = $data['name'];
+    $user->email = $data['email'];
+    if (!empty($data['password'])) {
+        $user->password = bcrypt($data['password']);
+    }
+    $user->save();
+
+    return redirect()->route('admins.index')->with('status', 'Administrador actualizado correctamente.');
+}
+    
+    public function destroy(User $user)
+{
+    $this->authorize('delete', $user);
+    // Chequeo 1: ¿Tiene OTROS roles además de admin_evento?
+    $otrosRoles = $user->roles()->where('name', '!=', 'admin_evento')->count();
+    if ($otrosRoles > 0) {
+        return back()->with('error', 'No se puede eliminar: el usuario tiene otros roles asignados.');
+    }
+
+    // Chequeo 2: ¿Es admin de algún evento?
+    $tieneEventos = $user->persona
+        ? $user->persona->eventosComoAdmin()->count()
+        : 0;
+    if ($tieneEventos > 0) {
+        return back()->with('error', 'No se puede eliminar: el usuario es administrador de uno o más eventos.');
+    }
+
+    // Proteger superadmin (no borrar accidentalmente)
+    if ($user->hasRole('superadmin')) {
+        return back()->with('error', 'No se puede eliminar un superadmin.');
+    }
+
+    // Si pasa todo, eliminar
+    $user->delete();
+
+    return redirect()->route('admins.index')->with('status', 'Administrador eliminado correctamente.');
+}
 }

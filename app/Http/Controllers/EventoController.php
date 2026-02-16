@@ -207,6 +207,15 @@ public function show(Evento $evento)
 
     public function edit($id)
     {
+        if (auth()->user()->hasRole('superadmin')) {
+            // Saltá la autorización, va directo
+            \Log::info("FORZADO controller: superadmin", [
+                'user_id' => auth()->id(),
+                'evento' => $evento->id,
+            ]);
+        } else {
+            $this->authorize('update', $evento);
+        }
         $evento = Evento::findOrFail($id);
 
         // Bypass para superadmin
@@ -218,7 +227,16 @@ public function show(Evento $evento)
     }
 
     public function update(Request $request, $id)
-{
+{   
+    if (auth()->user()->hasRole('superadmin')) {
+        // Saltá la autorización, va directo
+        \Log::info("FORZADO controller: superadmin", [
+            'user_id' => auth()->id(),
+            'evento' => $evento->id,
+        ]);
+    } else {
+        $this->authorize('update', $evento);
+    }
     Log::debug('Eventos@update payload', $request->except('_token'));
 
     try {

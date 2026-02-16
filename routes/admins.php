@@ -19,4 +19,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admins/{user}/events', [AdminManagementController::class, 'events'])
         ->middleware('role:superadmin')
         ->name('admins.events');
+        Route::delete('/admins/{user}', [AdminManagementController::class, 'destroy'])->name('admins.destroy');
+
+        Route::get('/admins/{user}/edit', [AdminManagementController::class, 'edit'])->name('admins.edit');
+Route::put('/admins/{user}', [AdminManagementController::class, 'update'])->name('admins.update');
 });
