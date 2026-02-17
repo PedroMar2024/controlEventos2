@@ -127,15 +127,17 @@ class EventoPolicy
 
     // Eliminar: solo superadmin (admins no pueden; igual superadmin pasa before)
     public function delete(User $user, Evento $evento): bool
-    {
-        $allowed = $user->hasRole('superadmin');
-        \Log::info("POLICY EventoPolicy.delete", [
-            'user_id' => $user->id,
-            'evento_id' => $evento->id,
-            'allowed' => $allowed,
-        ]);
-        return $allowed;
-    }
+{
+    // Admin del evento puede borrar mientras el evento esté pendiente
+    $allowed = $evento->estado === 'pendiente' && $this->esAdminEvento($user, $evento);
+    \Log::info("POLICY EventoPolicy.delete", [
+        'user_id' => $user->id,
+        'evento_id' => $evento->id,
+        'evento_estado' => $evento->estado,
+        'allowed' => $allowed,
+    ]);
+    return $allowed;
+}
 
     public function manageSubadmins(User $user, Evento $evento): bool
     {

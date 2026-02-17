@@ -24,15 +24,17 @@ class EventoController extends Controller
     $user = auth()->user();
 
     if ($user->hasRole('superadmin')) {
-        $eventos = Evento::orderBy('fecha_evento','desc')->paginate(15);
+        $eventos = \App\Models\Evento::with('personas') // CARGO LA LISTA DE PERSONAS/PERMISOS
+            ->orderBy('fecha_evento','desc')
+            ->paginate(15);
     } else {
         $personaId = optional($user->persona)->id;
 
-        // SOLO eventos donde el usuario está vinculado (admin o subadmin). Sin “publico”.
-        $eventos = Evento::whereHas('personas', function ($q) use ($personaId) {
+        $eventos = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
                 $q->where('personas.id', $personaId)
                   ->whereIn('event_persona_roles.role', ['admin','subadmin']);
             })
+            ->with('personas') // Aca tambien CARGO la lista para poder chequear los permisos en la vista
             ->orderBy('fecha_evento','desc')
             ->paginate(15);
     }
@@ -49,9 +51,12 @@ class EventoController extends Controller
     public function store(Request $request)
 {
     Log::debug('Eventos@store payload', $request->except('_token'));
-
     try {
-        $data = $request->validate([
+        $user = auth()->user();
+        $isSuperadmin = $user->hasRole('superadmin');
+
+        // VALIDACIÓN SEGÚN ROL
+        $rulesBase = [
             'nombre'        => ['required','string','max:255'],
             'descripcion'   => ['nullable','string'],
             'fecha_evento'  => ['nullable','date'],
@@ -60,18 +65,9 @@ class EventoController extends Controller
             'ubicacion'     => ['nullable','string','max:255'],
             'localidad'     => ['nullable','string','max:255'],
             'provincia'     => ['nullable','string','max:255'],
-            // 'capacidad'   => ['nullable','integer','min:1'], // Derivada de tickets: QUITADA
             'estado'        => ['nullable','in:pendiente,aprobado,finalizado'],
-            // 'precio_evento' => ['nullable','numeric','min:0'], // Deprecado: QUITADA
             'publico'       => ['nullable','boolean'],
             'reingreso'     => ['nullable','boolean'],
-
-            // Admin por email
-            'admin_email'   => ['required','email'],
-            'admin_nombre'  => ['nullable','string','max:255'],
-            'admin_dni'     => ['nullable','string','max:32'],
-
-            // Tickets (máximo 5)
             'tickets'            => ['nullable','array','max:5'],
             'tickets.*.id'       => ['nullable','integer'],
             'tickets.*.nombre'   => ['nullable','string','max:100'],
@@ -79,30 +75,30 @@ class EventoController extends Controller
             'tickets.*.cupo'     => ['nullable','integer','min:0'],
             'tickets.*.activo'   => ['nullable','boolean'],
             'tickets.*._destroy' => ['nullable','boolean'],
-        ]);
+        ];
 
-        // Persona admin por email
-        $adminPersona = Persona::where('email', $request->string('admin_email'))->first();
-        if (!$adminPersona) {
-            $request->validate([
-                'admin_nombre'  => ['required','string','max:255'],
-                'admin_dni'     => ['required','string','max:32'],
+        if ($isSuperadmin) {
+            $rules = array_merge($rulesBase, [
+                'admin_email'  => ['required','email'],
+                'admin_nombre' => ['nullable','string','max:255'],
+                'admin_dni'    => ['nullable','string','max:32'],
             ]);
-
-            $adminPersona = Persona::create([
-                'email'  => (string) $request->string('admin_email'),
-                'nombre' => (string) $request->string('admin_nombre'),
-                'dni'    => (string) $request->string('admin_dni'),
-            ]);
+        } else {
+            $rules = $rulesBase;
         }
+
+        $data = $request->validate($rules);
+
+        // === IDENTIFICAR Y OBTENER ADMIN/RESPONSABLE SEGÚN ROL ===
+        if ($isSuperadmin) {
             // Persona admin por email
             $adminPersona = Persona::where('email', $request->string('admin_email'))->first();
+
             if (!$adminPersona) {
                 $request->validate([
-                    'admin_nombre'  => ['required','string','max:255'],
-                    'admin_dni'     => ['required','string','max:32'],
+                    'admin_nombre' => ['required','string','max:255'],
+                    'admin_dni'    => ['required','string','max:32'],
                 ]);
-
                 $adminPersona = Persona::create([
                     'email'  => (string) $request->string('admin_email'),
                     'nombre' => (string) $request->string('admin_nombre'),
@@ -110,41 +106,40 @@ class EventoController extends Controller
                 ]);
             }
 
-            /* === Bloque insertar aquí: asegurar cuenta y enviar email === */
-            $user = User::where('email', $adminPersona->email)->first();
-
-            if (!$user) {
-                // Crea el User con password aleatoria y lo vincula a Persona
-                $user = User::create([
+            $adminUser = User::where('email', $adminPersona->email)->first();
+            if (!$adminUser) {
+                $adminUser = User::create([
                     'name'       => $adminPersona->nombre ?: $adminPersona->email,
                     'email'      => $adminPersona->email,
                     'password'   => bcrypt(Str::random(32)),
                     'persona_id' => $adminPersona->id,
                 ]);
-
-                // Envía el email con el link de "establecer contraseña"
-                $status = Password::sendResetLink(['email' => $user->email]);
-
-                \Log::info('Onboarding admin evento: reset link enviado', [
-                    'email'  => $user->email,
-                    'status' => $status,
-                ]);
+                Password::sendResetLink(['email' => $adminUser->email]);
             } else {
-                // Asegura vínculo a Persona si faltara
-                if (!$user->persona_id) {
-                    $user->persona_id = $adminPersona->id;
-                    $user->save();
+                if (!$adminUser->persona_id) {
+                    $adminUser->persona_id = $adminPersona->id;
+                    $adminUser->save();
                 }
-                // Si querés forzar reenvío del link siempre, descomenta:
-                // Password::sendResetLink(['email' => $user->email]);
             }
-            /* === Fin del bloque a insertar === */
+            $adminUser->assignRole('admin_evento');
+            $adminPersonaId = $adminPersona->id;
+        } else {
+            // Para admin_evento: el responsable es el logueado
+            $adminUser = $user;
+            $adminPersona = $user->persona;
+            if (!$adminPersona) {
+                // Si el usuario admin no tiene persona, creala (raro, pero seguro)
+                $adminPersona = Persona::create([
+                    'email'  => $user->email,
+                    'nombre' => $user->name,
+                    'dni'    => '', // Podés ajustarlo si tenés otro campo
+                ]);
+                $user->persona_id = $adminPersona->id;
+                $user->save();
+            }
+            $adminPersonaId = $adminPersona->id;
+        }
 
-            // Normalizar checkboxes y continuar con la creación del Evento…
-            $data['publico']   = $request->boolean('publico');
-            $data['reingreso'] = $request->boolean('reingreso');
-
-            // ... resto de tu método store (crear $evento, guardar, pivot admin, tickets y capacidad)
         // Normalizar checkboxes
         $data['publico']   = $request->boolean('publico');
         $data['reingreso'] = $request->boolean('reingreso');
@@ -156,29 +151,19 @@ class EventoController extends Controller
                 $evento->{$col} = $data[$col];
             }
         }
-        // Forzar provincia con lo que llega (evita que quede un valor previo o vacío)
         $evento->provincia = $request->input('provincia');
-
-        // Normaliza horas a H:i por si el browser envía con segundos
         $evento->hora_inicio = $request->filled('hora_inicio') ? substr($request->input('hora_inicio'), 0, 5) : null;
         $evento->hora_cierre = $request->filled('hora_cierre') ? substr($request->input('hora_cierre'), 0, 5) : null;
-
-        $evento->admin_persona_id = $adminPersona->id;
-
-        Log::info('STORE provincia', [
-            'input' => $request->input('provincia'),
-        ]);
-
+        $evento->admin_persona_id = $adminPersonaId;
+        if (!$user->hasRole('superadmin')) {
+            $evento->estado = 'pendiente';
+        }
         $evento->save();
-
-        Log::info('STORE provincia AFTER', [
-            'persisted' => $evento->provincia,
-        ]);
 
         // Pivot rol admin
         if (method_exists($evento, 'personas')) {
             $evento->personas()->syncWithoutDetaching([
-                $adminPersona->id => ['role' => 'admin']
+                $adminPersonaId => ['role' => 'admin']
             ]);
         }
 
@@ -188,7 +173,7 @@ class EventoController extends Controller
         $evento->save();
 
         return redirect()->route('eventos.index')->with('success', 'Evento creado correctamente.');
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         Log::error('Error en Eventos@store', [
             'error' => $e->getMessage(),
             'file'  => $e->getFile(),
@@ -205,47 +190,19 @@ public function show(Evento $evento)
     return view('eventos.show', compact('evento'));
 }
 
-    public function edit($id)
-    {
-        if (auth()->user()->hasRole('superadmin')) {
-            // Saltá la autorización, va directo
-            \Log::info("FORZADO controller: superadmin", [
-                'user_id' => auth()->id(),
-                'evento' => $evento->id,
-            ]);
-        } else {
-            $this->authorize('update', $evento);
-        }
-        $evento = Evento::findOrFail($id);
+public function edit(Evento $evento)
+{
+    // El middleware de ruta (can:update,evento) ya chequea permisos.
+    // Si llegás acá, todo bien. Superadmin ya entra siempre porque el before de la policy lo permite.
+    return view('eventos.edit', compact('evento'));
+}
 
-        // Bypass para superadmin
-        if (!auth()->user()->hasRole('superadmin')) {
-            Gate::authorize('editar-evento', $evento);
-        }
-
-        return view('eventos.edit', compact('evento'));
-    }
-
-    public function update(Request $request, $id)
-{   
-    if (auth()->user()->hasRole('superadmin')) {
-        // Saltá la autorización, va directo
-        \Log::info("FORZADO controller: superadmin", [
-            'user_id' => auth()->id(),
-            'evento' => $evento->id,
-        ]);
-    } else {
-        $this->authorize('update', $evento);
-    }
+public function update(Request $request, Evento $evento)
+{
+    // El middleware ya chequeó la policy y si pasa, puede actualizar.
     Log::debug('Eventos@update payload', $request->except('_token'));
 
     try {
-        $evento = Evento::findOrFail($id);
-
-        if (!auth()->user()->hasRole('superadmin')) {
-            Gate::authorize('editar-evento', $evento);
-        }
-
         $validated = $request->validate([
             'nombre'        => ['required','string','max:255'],
             'descripcion'   => ['nullable','string'],
@@ -255,9 +212,7 @@ public function show(Evento $evento)
             'ubicacion'     => ['nullable','string','max:255'],
             'localidad'     => ['nullable','string','max:255'],
             'provincia'     => ['nullable','string','max:255'],
-            // 'capacidad'   => ['nullable','integer','min:1'], // Derivada de tickets: QUITADA
             'estado'        => ['required','in:pendiente,aprobado,finalizado'],
-            // 'precio_evento' => ['nullable','numeric','min:0'], // Deprecado: QUITADA
             'publico'       => ['boolean'],
             'reingreso'     => ['nullable','boolean'],
 
@@ -280,11 +235,8 @@ public function show(Evento $evento)
             }
         }
 
-        // Forzar provincia con lo que llega
         $before = $evento->provincia;
         $evento->provincia = $request->input('provincia');
-
-        // Normaliza horas a H:i
         $evento->hora_inicio = $request->filled('hora_inicio') ? substr($request->input('hora_inicio'), 0, 5) : null;
         $evento->hora_cierre = $request->filled('hora_cierre') ? substr($request->input('hora_cierre'), 0, 5) : null;
 
@@ -292,7 +244,9 @@ public function show(Evento $evento)
             'before' => $before,
             'input'  => $request->input('provincia'),
         ]);
-
+        if (!$user->hasRole('superadmin')) {
+            $evento->estado = $evento->getOriginal('estado');
+        }
         $evento->save();
 
         Log::info('UPDATE provincia AFTER', [
@@ -300,13 +254,13 @@ public function show(Evento $evento)
             'dirty' => $evento->getChanges(),
         ]);
 
-        // Sincroniza tickets y deriva capacidad
+        // Tickets/capacidad
         $this->syncTickets($evento, $request->input('tickets', []));
         $evento->capacidad = $this->computeCapacityFromTickets($evento);
         $evento->save();
 
         return redirect()->route('eventos.index')->with('success', 'Evento actualizado');
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         Log::error('Error en Eventos@update', [
             'error' => $e->getMessage(),
             'file'  => $e->getFile(),
@@ -315,17 +269,13 @@ public function show(Evento $evento)
         return back()->withInput()->withErrors(['app' => $e->getMessage()]);
     }
 }
-    public function destroy($id)
-    {
-        $evento = Evento::findOrFail($id);
-
-        if (!auth()->user()->hasRole('superadmin')) {
-            Gate::authorize('eliminar-evento', $evento);
-        }
-
-        $evento->delete();
-        return redirect()->route('eventos.index')->with('success', 'Evento eliminado');
-    }
+public function destroy(Evento $evento)
+{
+    // Si llegás acá, ya pasaste el middleware can:delete,evento
+    // NO autorices manualmente: la policy se encargó antes
+    $evento->delete();
+    return redirect()->route('eventos.index')->with('success', 'Evento eliminado');
+}
 
     // Opcionales si existen en tus rutas:
     public function aprobar(\App\Models\Evento $evento)

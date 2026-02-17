@@ -11,7 +11,7 @@ class AuthServiceProvider extends ServiceProvider
     // Registra la Policy de Evento
     protected $policies = [
         \App\Models\Evento::class => \App\Policies\EventoPolicy::class,
-        \App\Models\User::class   => \App\Policies\UserPolicy::class,
+        \App\Models\User::class => \App\Policies\UserPolicy::class, // <-- Línea nueva
     ];
 
     public function boot(): void

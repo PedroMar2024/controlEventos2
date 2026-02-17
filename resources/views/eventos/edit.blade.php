@@ -36,13 +36,22 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Estado</label>
                             @php $estado = old('estado', $evento->estado); @endphp
-                            <select name="estado"
-                                    class="mt-1 block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                <option value="pendiente"  {{ $estado === 'pendiente'  ? 'selected' : '' }}>Pendiente</option>
-                                <option value="aprobado"   {{ $estado === 'aprobado'   ? 'selected' : '' }}>Aprobado</option>
-                                <option value="finalizado" {{ $estado === 'finalizado' ? 'selected' : '' }}>Finalizado</option>
-                            </select>
-                            @error('estado') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+
+                            @role('superadmin')
+                                <select name="estado"
+                                        class="mt-1 block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                    <option value="pendiente"  {{ $estado === 'pendiente'  ? 'selected' : '' }}>Pendiente</option>
+                                    <option value="aprobado"   {{ $estado === 'aprobado'   ? 'selected' : '' }}>Aprobado</option>
+                                    <option value="finalizado" {{ $estado === 'finalizado' ? 'selected' : '' }}>Finalizado</option>
+                                </select>
+                                @error('estado') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            @else
+                                <div class="mt-1 block w-full rounded-md border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+                                    {{ ucfirst($estado) }}
+                                </div>
+                                <!-- El admin_evento nunca puede enviar otro estado (sólo el mismo valor del evento) -->
+                                <input type="hidden" name="estado" value="{{ $estado }}">
+                            @endrole
                         </div>
                     </div>
 

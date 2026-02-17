@@ -59,9 +59,9 @@ class AdminManagementController extends Controller
     }
     
     public function edit(User $user)
-{
-    return view('admins.edit', compact('user'));
-}
+    {
+        return view('admins.edit', ['user' => $user]);
+    }
  
 public function update(Request $request, User $user)
 {

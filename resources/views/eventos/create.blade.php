@@ -25,38 +25,46 @@
                 <form method="POST" action="{{ route('eventos.store') }}" class="space-y-8" id="create-event-form">
                     @csrf
 
+                    {{-- SOLO EL SUPERADMIN VE EL BLOQUE DE ADMIN DEL EVENTO --}}
+                    @role('superadmin')
                     <div class="rounded-md border border-gray-200 p-4">
                         <h2 class="text-sm font-semibold text-gray-800">Administrador del evento</h2>
                         <p class="mt-1 text-xs text-gray-500">
                             Ingresa el email. Si existe, se autocompletan y se bloquean Nombre y DNI. Si no, completa esos datos mínimos.
                         </p>
-
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                             <div class="md:col-span-1">
                                 <label class="block text-sm font-medium text-gray-700">Email (único)</label>
                                 <input type="email" name="admin_email" id="admin_email" value="{{ old('admin_email') }}" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
-                                       placeholder="admin@ejemplo.com">
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
+                                    placeholder="admin@ejemplo.com">
                                 @error('admin_email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                                 <p id="admin_email_status" class="mt-1 text-xs"></p>
                             </div>
                             <div class="md:col-span-1">
                                 <label class="block text-sm font-medium text-gray-700">Nombre</label>
                                 <input type="text" name="admin_nombre" id="admin_nombre" value="{{ old('admin_nombre') }}"
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
-                                       placeholder="Nombre del administrador">
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
+                                    placeholder="Nombre del administrador">
                                 @error('admin_nombre') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                             </div>
                             <div class="md:col-span-1">
                                 <label class="block text-sm font-medium text-gray-700">DNI</label>
                                 <input type="text" name="admin_dni" id="admin_dni" value="{{ old('admin_dni') }}"
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
-                                       placeholder="DNI">
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
+                                    placeholder="DNI">
                                 @error('admin_dni') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
                     </div>
+                    @endrole
 
+                    {{-- SI SOS ADMIN_EVENTO, SE ASIGNA TU USUARIO COMO ADMIN EN EL CONTROLADOR --}}
+                    @role('admin_evento')
+                        <input type="hidden" name="admin_id" value="{{ auth()->id() }}">
+                    @endrole
+
+                    {{-- resto del formulario sin cambios --}}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Nombre del evento</label>
@@ -66,17 +74,27 @@
                             @error('nombre') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Estado</label>
-                            <select name="estado"
-                                    class="mt-1 block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                <option value="pendiente"  {{ old('estado') === 'pendiente'  ? 'selected' : '' }}>Pendiente</option>
-                                <option value="aprobado"   {{ old('estado') === 'aprobado'   ? 'selected' : '' }}>Aprobado</option>
-                                <option value="finalizado" {{ old('estado') === 'finalizado' ? 'selected' : '' }}>Finalizado</option>
-                            </select>
-                            @error('estado') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            {{-- CAMBIO: SOLO EL SUPERADMIN EDITA EL ESTADO --}}
+                            @role('superadmin')
+                                <label class="block text-sm font-medium text-gray-700">Estado</label>
+                                <select name="estado"
+                                        class="mt-1 block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                    <option value="pendiente"  {{ old('estado') === 'pendiente'  ? 'selected' : '' }}>Pendiente</option>
+                                    <option value="aprobado"   {{ old('estado') === 'aprobado'   ? 'selected' : '' }}>Aprobado</option>
+                                    <option value="finalizado" {{ old('estado') === 'finalizado' ? 'selected' : '' }}>Finalizado</option>
+                                </select>
+                                @error('estado') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            @else
+                                <label class="block text-sm font-medium text-gray-700">Estado</label>
+                                <div class="mt-1 block w-full rounded-md border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+                                    <!-- el admin ve el estado fijo, el valor viene de old o default -->
+                                    {{ ucfirst(old('estado', 'pendiente')) }}
+                                </div>
+                                <input type="hidden" name="estado" value="{{ old('estado', 'pendiente') }}">
+                            @endrole
                         </div>
                     </div>
-
+                    
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700">Fecha del evento</label>
@@ -121,9 +139,6 @@
                             @error('provincia') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
-
-                    {{-- Capacidad y precio del evento eliminados (capacidad se deriva de los tickets, precio por ticket) --}}
-
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="flex items-center">
                             <input type="checkbox" id="publico" name="publico" value="1" {{ old('publico') ? 'checked' : '' }}
@@ -162,6 +177,8 @@
         </div>
     </div>
 
+    {{-- El script se mantiene igual, ya que solo aplica si está la sección visible --}}
+    @role('superadmin')
     <script>
       async function lookupPersonaByEmail(email) {
         const status = document.getElementById('admin_email_status');
@@ -212,4 +229,5 @@
         lookupPersonaByEmail(e.target.value);
       });
     </script>
+    @endrole
 @endsection

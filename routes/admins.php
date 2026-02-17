@@ -16,11 +16,15 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('role:superadmin')
         ->name('admins.store');
 
-    Route::get('/admins/{user}/events', [AdminManagementController::class, 'events'])
+        Route::delete('/admins/{user}', [AdminManagementController::class, 'destroy'])
         ->middleware('role:superadmin')
-        ->name('admins.events');
-        Route::delete('/admins/{user}', [AdminManagementController::class, 'destroy'])->name('admins.destroy');
-
-        Route::get('/admins/{user}/edit', [AdminManagementController::class, 'edit'])->name('admins.edit');
-Route::put('/admins/{user}', [AdminManagementController::class, 'update'])->name('admins.update');
+        ->name('admins.destroy');
+    
+    Route::get('/admins/{user}/edit', [AdminManagementController::class, 'edit'])
+        ->middleware('role:superadmin')
+        ->name('admins.edit');
+    
+    Route::put('/admins/{user}', [AdminManagementController::class, 'update'])
+        ->middleware('role:superadmin')
+        ->name('admins.update');
 });
