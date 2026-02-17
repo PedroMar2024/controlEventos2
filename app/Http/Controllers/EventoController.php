@@ -271,10 +271,22 @@ public function update(Request $request, Evento $evento)
 }
 public function destroy(Evento $evento)
 {
-    // Si llegás acá, ya pasaste el middleware can:delete,evento
-    // NO autorices manualmente: la policy se encargó antes
+    // Guardar las personas que estaban asociadas al evento ANTES de eliminarlo
+    $personas = $evento->personas()->get();
+
+    // Eliminar el evento (esto borra los pivotes evento_persona)
     $evento->delete();
-    return redirect()->route('eventos.index')->with('success', 'Evento eliminado');
+
+    // Para cada persona, comprobar si sigue en algún evento
+    foreach ($personas as $persona) {
+        // Contar cuántos eventos tiene la persona después de eliminar este
+        $eventosRestantes = $persona->eventos()->count();
+        if ($eventosRestantes === 0) {
+            $persona->delete(); // Elimina a la persona si ya no está en ningún evento
+        }
+    }
+
+    return redirect()->route('eventos.index')->with('success', 'Evento y personas sin eventos, eliminados correctamente.');
 }
 
     // Opcionales si existen en tus rutas:
