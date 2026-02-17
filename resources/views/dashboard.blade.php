@@ -8,10 +8,6 @@
         $globalRoles = $user->getRoleNames()->join(', ');
         $personaId = optional($user->persona)->id;
 
-        // Totales para las cards resumen
-        $totalAdmins = \App\Models\User::whereHas('roles', function($q) { $q->where('name', 'admin'); })->count();
-        $totalEventos = \App\Models\Evento::count();
-
         // Eventos por rol (pivote event_persona_roles)
         $eventosAdmin = \App\Models\Evento::with(['personas' => function ($q) use ($personaId) {
                 $q->where('personas.id', $personaId);
@@ -73,27 +69,197 @@
             </p>
         </div>
 
-        <!-- DASHBOARD CARDS RESUMEN -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <!-- Card MIS ADMINISTRADORES -->
-            <div class="bg-white rounded-lg shadow p-6 flex flex-col items-center justify-center text-center">
-                <div class="text-5xl text-blue-600 font-black mb-2">{{ $totalAdmins }}</div>
-                <div class="text-lg font-semibold mb-4">MIS ADMINISTRADORES</div>
-                <a href="{{ route('admins.index') }}" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium">
-                    Gestionar
+        {{-- Superadmin: acceso rápido a administración de usuarios administradores y vista de todos los eventos --}}
+        @if($esSuperadmin)
+        <div class="rounded-lg bg-white shadow p-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-semibold">Panel de Superadmin</h3>
+                <a href="{{ route('admins.index') }}"
+                   class="text-sm px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                    Administradores
                 </a>
             </div>
-            <!-- Card EVENTOS -->
-            <div class="bg-white rounded-lg shadow p-6 flex flex-col items-center justify-center text-center">
-                <div class="text-5xl text-indigo-600 font-black mb-2">{{ $totalEventos }}</div>
-                <div class="text-lg font-semibold mb-4">EVENTOS</div>
-                <a href="{{ route('eventos.index') }}" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 font-medium">
-                    Gestionar
-                </a>
+
+            @if($eventosTodos->isEmpty())
+              <p class="mt-3 text-sm text-gray-500">No hay eventos creados aún.</p>
+            @else
+              <div class="mt-3 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach($eventosTodos as $ev)
+                      <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
+                            {{ $fmtEstado($ev) }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <div class="flex justify-end gap-2">
+                            <a href="{{ route('eventos.show', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                            {{-- Superadmin puede editar siempre --}}
+                            <a href="{{ route('eventos.edit', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                            {{-- Eliminación y aprobación/cancelación se gestionan desde vistas específicas; no en el dashboard --}}
+                          </div>
+                        </td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            @endif
+        </div>
+        @endif
+
+        {{-- Admin: sus eventos (tabla moderna), sin aprobar/cancelar, Editar solo si Policy lo permite --}}
+        @if($esSuperadmin || $eventosAdmin->isNotEmpty())
+        <div class="rounded-lg bg-white shadow p-6">
+            <h3 class="text-base font-semibold">Eventos donde eres ADMIN</h3>
+
+            @if($eventosAdmin->isEmpty())
+              <p class="mt-2 text-sm text-gray-500">No tienes eventos como admin.</p>
+            @else
+              <div class="mt-3 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach($eventosAdmin as $ev)
+                      <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
+                            {{ $fmtEstado($ev) }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $badge['admin'] }}">Admin</span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <div class="flex justify-end gap-2">
+                            <a href="{{ route('eventos.show', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                            @can('update', $ev)
+                              <a href="{{ route('eventos.edit', $ev->id) }}"
+                                 class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                            @endcan
+                          </div>
+                        </td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            @endif
+        </div>
+        @endif
+
+        {{-- Subadmin: solo ver --}}
+        @if($esSuperadmin || $eventosSubadmin->isNotEmpty())
+        <div class="rounded-lg bg-white shadow p-6">
+            <h3 class="text-base font-semibold">Eventos donde eres SUBADMIN</h3>
+
+            @if($eventosSubadmin->isEmpty())
+              <p class="mt-2 text-sm text-gray-500">No tienes eventos como subadmin.</p>
+            @else
+              <div class="mt-3 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach($eventosSubadmin as $ev)
+                      <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
+                            {{ $fmtEstado($ev) }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $badge['subadmin'] }}">Subadmin</span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">
+                          <div class="flex justify-end gap-2">
+                            <a href="{{ route('eventos.show', $ev->id) }}"
+                               class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                          </div>
+                        </td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            @endif
+        </div>
+        @endif
+
+        {{-- Invitado: solo ver --}}
+        @if($eventosInvitado->isNotEmpty())
+        <div class="rounded-lg bg-white shadow p-6">
+            <h3 class="text-base font-semibold">Eventos donde eres INVITADO</h3>
+            <div class="mt-3 overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  @foreach($eventosInvitado as $ev)
+                    <tr>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ $ev->nombre }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-700">{{ $fmtFecha($ev) }}</td>
+                      <td class="px-4 py-2 text-sm">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $estadoChip($ev) }}">
+                          {{ $fmtEstado($ev) }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-2 text-sm">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $badge['invitado'] }}">Invitado</span>
+                      </td>
+                      <td class="px-4 py-2 text-sm">
+                        <div class="flex justify-end gap-2">
+                          <a href="{{ route('eventos.show', $ev->id) }}"
+                             class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">Ver</a>
+                        </div>
+                      </td>
+                    </tr>
+                  @endforeach
+                </tbody>
+              </table>
             </div>
         </div>
-
-        {{-- (Resto de tu dashboard sigue igual: paneles, tablas y cards por roles) --}}
-        {{-- ... (todo el código que ya tenés de las tablas/cards de eventos) ... --}}
+        @endif
     </div>
 @endsection
