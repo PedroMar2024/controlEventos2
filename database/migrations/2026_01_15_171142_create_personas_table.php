@@ -9,12 +9,12 @@ return new class extends Migration {
     {
         Schema::create('personas', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre')->nullable();
-            $table->string('apellido')->nullable();
-            $table->string('dni')->nullable()->unique();
-            $table->string('telefono')->nullable();
-            $table->string('email')->nullable()->unique();
-            $table->string('direccion')->nullable();
+            $table->string('nombre');                // Ahora obligatorio
+            $table->string('apellido');              // Ahora obligatorio
+            $table->string('dni')->unique();         // Obligatorio y único
+            $table->string('telefono')->nullable();  // Opcional
+            $table->string('email')->unique();       // Obligatorio y único
+            $table->string('direccion')->nullable(); // Opcional
             $table->timestamps();
         });
     }

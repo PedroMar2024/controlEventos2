@@ -4,9 +4,15 @@
 
 @section('content')
   @php
+    use App\Models\Persona;
     $admin   = optional($admin ?? null);
     $count   = $count ?? 0;
     $limit   = 10;
+    // Buscar persona solo si viene el email por GET (desde el buscador)
+    $personaBuscada = null;
+    if(request('buscar_email')) {
+        $personaBuscada = Persona::where('email', request('buscar_email'))->first();
+    }
   @endphp
 
   <div class="mx-auto max-w-3xl py-8">
@@ -62,40 +68,78 @@
             <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Agregar subadmin</p>
 
             @if ($count < $limit)
-              <form method="POST" action="{{ route('eventos.equipo.subadmins.store', $evento) }}" class="space-y-3">
-                @csrf
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-xs text-gray-600 mb-1">Email</label>
-                    <input type="email" name="email" required
-                           class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
-                    @error('email')
-                      <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                    @enderror
+              {{-- PASO 1: buscar persona por email --}}
+              <form method="GET" action="{{ route('eventos.equipo.index', $evento) }}" class="mb-4">
+                  <div class="flex gap-2">
+                      <input type="email" name="buscar_email"
+                             value="{{ request('buscar_email') }}"
+                             placeholder="Email del subadmin"
+                             required
+                             class="rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                      <button type="submit" class="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm">
+                        Buscar
+                      </button>
                   </div>
-                  <div>
-                    <label class="block text-xs text-gray-600 mb-1">Nombre (opcional)</label>
-                    <input type="text" name="nombre"
-                           class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
-                    @error('nombre')
-                      <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                    @enderror
-                  </div>
-                </div>
-
-                @error('limit')
-                  <p class="text-xs text-red-600">{{ $message }}</p>
-                @enderror
-                @error('duplicate')
-                  <p class="text-xs text-red-600">{{ $message }}</p>
-                @enderror
-
-                <button type="submit"
-                        class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                  Agregar subadmin
-                </button>
               </form>
+
+              {{-- PASO 2: si ya se buscó un email, mostrar el form adecuado --}}
+              @if(request('buscar_email'))
+                <form method="POST" action="{{ route('eventos.equipo.subadmins.store', $evento) }}" class="space-y-3">
+                  @csrf
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <div>
+                      <label class="block text-xs text-gray-600 mb-1">Nombre</label>
+                      <input type="text" name="nombre"
+                             value="{{ old('nombre', $personaBuscada->nombre ?? '') }}"
+                             {{ $personaBuscada ? 'readonly' : 'required' }}
+                             class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                      @error('nombre')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                      @enderror
+                    </div>
+
+                    <div>
+                      <label class="block text-xs text-gray-600 mb-1">Apellido</label>
+                      <input type="text" name="apellido"
+                             value="{{ old('apellido', $personaBuscada->apellido ?? '') }}"
+                             {{ $personaBuscada ? 'readonly' : 'required' }}
+                             class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                      @error('apellido')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                      @enderror
+                    </div>
+
+                    <div>
+                      <label class="block text-xs text-gray-600 mb-1">DNI</label>
+                      <input type="text" name="dni"
+                             value="{{ old('dni', $personaBuscada->dni ?? '') }}"
+                             {{ $personaBuscada ? 'readonly' : 'required' }}
+                             class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                      @error('dni')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                      @enderror
+                    </div>
+
+                    <div>
+                      <label class="block text-xs text-gray-600 mb-1">Email</label>
+                      <input type="email" name="email"
+                             value="{{ old('email', $personaBuscada->email ?? request('buscar_email')) }}"
+                             required {{ $personaBuscada ? 'readonly' : '' }}
+                             class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                      @error('email')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                      @enderror
+                    </div>
+
+                  </div>
+
+                  <button type="submit"
+                          class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    Agregar subadmin
+                  </button>
+                </form>
+              @endif
             @else
               <p class="text-sm text-gray-600">Se alcanzó el límite de {{ $limit }} subadmins para este evento.</p>
             @endif

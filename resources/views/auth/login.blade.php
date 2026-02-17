@@ -25,6 +25,11 @@
                 <input type="password" name="password" required
                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
             </div>
+            <div class="flex items-center justify-end mt-4">
+                <a class="underline text-sm text-gray-600 hover:text-gray-900" href="{{ route('password.request') }}">
+                    ¿Olvidaste tu contraseña?
+                </a>
+            </div>
             <div class="flex items-center">
                 <input type="checkbox" name="remember" id="remember"
                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">

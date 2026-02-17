@@ -35,51 +35,82 @@ class AdminManagementController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $data = $request->validate([
-            'name'  => ['required','string','max:255'],
-            'email' => ['required','email','max:255','unique:users,email'],
-        ]);
+{
+    $data = $request->validate([
+        'nombre'   => ['required', 'string', 'max:255'],
+        'apellido' => ['required', 'string', 'max:255'],
+        'dni'      => ['required', 'string', 'max:255', 'unique:personas,dni'],
+        'email'    => ['required', 'email', 'max:255', 'unique:users,email', 'unique:personas,email'],
+    ]);
 
-        $user = User::create([
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'password' => bcrypt(Str::random(32)),
-        ]);
+    // Crear Persona primero, sí o sí con todos los datos completos (ya controla duplicidad por unique en dni/email)
+    $persona = \App\Models\Persona::create([
+        'nombre'   => $data['nombre'],
+        'apellido' => $data['apellido'],
+        'dni'      => $data['dni'],
+        'email'    => $data['email'],
+    ]);
 
-        $persona = Persona::firstOrCreate(['email' => $user->email], ['nombre' => $user->name]);
-        $user->persona_id = $persona->id;
-        $user->save();
+    // Crear User y vincularlo
+    $user = \App\Models\User::create([
+        'name'       => $data['nombre'] . ' ' . $data['apellido'],
+        'email'      => $data['email'],
+        'password'   => bcrypt(Str::random(32)),
+        'persona_id' => $persona->id,
+    ]);
 
-        $user->assignRole('admin_evento');
+    $user->assignRole('admin_evento');
 
-        Password::sendResetLink(['email' => $user->email]);
+    \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
 
-        return redirect()->route('admins.index')->with('status', 'Administrador creado. Se envió email de reseteo.');
-    }
+    return redirect()->route('admins.index')->with('status', 'Administrador creado. Se envió email de reseteo.');
+}
     
     public function edit(User $user)
     {
         return view('admins.edit', ['user' => $user]);
     }
  
-public function update(Request $request, User $user)
-{
-    $data = $request->validate([
-        'name'  => ['required', 'string', 'max:255'],
-        'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
-        'password' => ['nullable', 'string', 'min:8'],
-    ]);
-
-    $user->name = $data['name'];
-    $user->email = $data['email'];
-    if (!empty($data['password'])) {
-        $user->password = bcrypt($data['password']);
+    public function update(Request $request, User $user)
+    {
+        $data = $request->validate([
+            'nombre'   => ['required', 'string', 'max:255'],
+            'apellido' => ['required', 'string', 'max:255'],
+            'dni'      => ['required', 'string', 'max:255', 'unique:personas,dni,'.$user->persona_id],
+            'email'    => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id, 'unique:personas,email,'.$user->persona_id],
+            'password' => ['nullable', 'string', 'min:8'],
+        ]);
+    
+        // Actualiza la persona vinculada
+        $persona = $user->persona;
+        $persona->nombre   = $data['nombre'];
+        $persona->apellido = $data['apellido'];
+        $persona->dni      = $data['dni'];
+        $persona->email    = $data['email'];
+        $persona->save();
+    
+        // Actualiza el usuario
+        $user->name  = $data['nombre'] . ' ' . $data['apellido'];
+        $emailCambio = $user->email !== $data['email'];
+        $user->email = $data['email'];
+        if (!empty($data['password'])) {
+            $user->password = bcrypt($data['password']);
+        }
+        
+        // Si el email fue cambiado, desvalida y manda mail de confirmación
+        if ($emailCambio) {
+            $user->email_verified_at = null;
+            $user->save();
+    
+            if (method_exists($user, 'sendEmailVerificationNotification')) {
+                $user->sendEmailVerificationNotification();
+            }
+        } else {
+            $user->save();
+        }
+    
+        return redirect()->route('admins.index')->with('status', 'Administrador actualizado correctamente.');
     }
-    $user->save();
-
-    return redirect()->route('admins.index')->with('status', 'Administrador actualizado correctamente.');
-}
     
     public function destroy(User $user)
 {
