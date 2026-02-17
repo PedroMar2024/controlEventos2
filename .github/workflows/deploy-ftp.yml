@@ -53,14 +53,14 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
 
-          # Si usas el usuario FTP dedicado que apunta a /home/c7525/public_html/controlDeEventos/:
-          # server-dir: ./   # raíz del usuario
-          # Si usas el usuario principal c7525 (raíz /home/c7525/), usa:
-          server-dir: ./      
+          # Si usas el usuario FTP que apunta directo al folder del sistema (ej: /home/c7525/public_html/controlDeEventos/)
+          # entonces pon './'
+          # Si tu usuario FTP entra a la raíz de tu usuario y ahí está el sistema como subcarpeta, pon './controlDeEventos/' o similar
+          server-dir: ./       
 
-          local-dir: ./               # envía el proyecto ya compilado
-          # NO borrar el remoto para preservar .env y otros archivos manuales
-          dangerous-clean-slate: false
+          local-dir: ./               # manda proyecto compilado
+          dangerous-clean-slate: false    # NO borra carpeta remota, preserva uploads/.env
+
           exclude: |
             .git/**
             .github/**
@@ -75,7 +75,7 @@ jobs:
             vendor/bin/**
             **/*.map
 
-      # Migraciones por HTTP (opcional). Requiere endpoint en tu app.
+      # Migraciones por HTTP (opcional, tu app debe tener endpoint protegido para migraciones)
       - name: Run migrations (HTTP trigger)
         env:
           MIGRATE_URL: ${{ secrets.MIGRATE_URL }}
