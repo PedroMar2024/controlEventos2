@@ -13,21 +13,21 @@ class PersonaController extends Controller
     }
 
     public function findByEmail(Request $request)
-    {
-        $request->validate(['email' => ['required','email']]);
-        $p = Persona::where('email', $request->string('email'))->first();
+{
+    $request->validate(['email' => ['required','email']]);
+    $p = Persona::where('email', $request->string('email'))->first();
 
-        if (!$p) {
-            return response()->json(['found' => false]);
-        }
-
-        return response()->json([
-            'found' => true,
-            'id' => $p->id,
-            'nombre' => $p->nombre,
-            'apellido' => $p->apellido,
-            'dni' => $p->dni,
-            'email' => $p->email,
-        ]);
+    if (!$p) {
+        return response()->json(['found' => false]);
     }
+
+    return response()->json([
+        'found' => true,
+        'id' => $p->id,
+        'nombre' => $p->nombre,
+        'apellido' => $p->apellido,
+        'dni' => $p->dni,
+        'email' => $p->email,
+    ]);
+}
 }

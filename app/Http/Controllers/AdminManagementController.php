@@ -66,10 +66,26 @@ class AdminManagementController extends Controller
     return redirect()->route('admins.index')->with('status', 'Administrador creado. Se envió email de reseteo.');
 }
     
-    public function edit(User $user)
-    {
-        return view('admins.edit', ['user' => $user]);
-    }
+public function edit(User $user)
+{
+    // SIEMPRE tenés el user,
+    // 1. Buscá la persona asociada
+    $persona = $user->persona;
+
+    // 2. Buscá el evento donde está como admin (ajustá el WHERE si tienes muchos)
+    // Suponiendo que una persona puede ser admin de más de un evento, elegí 1 o pedí la lista
+    $eventoAdmin = \DB::table('event_persona_roles')
+        ->where('persona_id', $persona->id)
+        ->where('role', 'admin')
+        ->join('eventos', 'eventos.id', '=', 'event_persona_roles.evento_id')
+        ->select('eventos.*')
+        ->first();
+
+    return view('admins.edit', [
+        'user' => $user,
+        'evento' => $eventoAdmin, // PASARLO A LA VISTA
+    ]);
+}
  
     public function update(Request $request, User $user)
     {
@@ -113,30 +129,67 @@ class AdminManagementController extends Controller
     }
     
     public function destroy(User $user)
+    {
+        $this->authorize('delete', $user);
+    
+        // No permitir eliminar superadmin ni admins con roles extra
+        $otrosRoles = $user->roles()->where('name', '!=', 'admin_evento')->count();
+        if ($otrosRoles > 0) {
+            return back()->with('error', 'No se puede eliminar: el usuario tiene otros roles asignados.');
+        }
+        if ($user->hasRole('superadmin')) {
+            return back()->with('error', 'No se puede eliminar un superadmin.');
+        }
+    
+        // Traer persona asociada
+        $persona = $user->persona;
+    
+        // --- BLOQUE CRÍTICO ---
+        // No permitir eliminar si persona está asociada a algún evento (admin, subadmin o invitado)
+        if ($persona) {
+            $vinculadoAEvento = \DB::table('event_persona_roles')
+                ->where('persona_id', $persona->id)
+                ->whereIn('role', ['admin', 'subadmin', 'invitado'])
+                ->exists();
+            if ($vinculadoAEvento) {
+                return back()->with('error', 'No se puede eliminar: la persona está asociada a al menos un evento (admin, subadmin o invitado).');
+            }
+        }
+    
+        // Antes de limpiar, eliminar cualquier vínculo con eventos en la tabla pivote (por si quedó algo colgado)
+        if ($persona) {
+            \DB::table('event_persona_roles')->where('persona_id', $persona->id)->delete();
+        }
+    
+        // Limpiar roles globales en model_has_roles
+        $user->roles()->detach();
+    
+        // Borrar el usuario
+        $user->delete();
+    
+        // Si la persona queda huérfana, eliminarla
+        if ($persona) {
+            $enEventos = \DB::table('event_persona_roles')->where('persona_id', $persona->id)->exists();
+            $tieneVinculoUser = \App\Models\User::where('persona_id', $persona->id)->exists();
+            if (!$enEventos && !$tieneVinculoUser) {
+                $persona->delete();
+            }
+        }
+    
+        return redirect()->route('admins.index')->with('status', 'Administrador y ficha eliminados correctamente.');
+    }
+    public function eventos(User $admin)
 {
-    $this->authorize('delete', $user);
-    // Chequeo 1: ¿Tiene OTROS roles además de admin_evento?
-    $otrosRoles = $user->roles()->where('name', '!=', 'admin_evento')->count();
-    if ($otrosRoles > 0) {
-        return back()->with('error', 'No se puede eliminar: el usuario tiene otros roles asignados.');
+    // Sacar la persona asociada
+    $persona = $admin->persona;
+    if (!$persona) {
+        // Si no hay persona, puede que sea un bug...
+        return redirect()->route('admins.index')->with('error', 'Este admin no tiene persona asociada.');
     }
 
-    // Chequeo 2: ¿Es admin de algún evento?
-    $tieneEventos = $user->persona
-        ? $user->persona->eventosComoAdmin()->count()
-        : 0;
-    if ($tieneEventos > 0) {
-        return back()->with('error', 'No se puede eliminar: el usuario es administrador de uno o más eventos.');
-    }
+    // Buscar todos los eventos donde es admin/subadmin/invitado (usando el pivot)
+    $eventos = $persona->eventos()->withPivot('role')->with('tickets')->get();
 
-    // Proteger superadmin (no borrar accidentalmente)
-    if ($user->hasRole('superadmin')) {
-        return back()->with('error', 'No se puede eliminar un superadmin.');
-    }
-
-    // Si pasa todo, eliminar
-    $user->delete();
-
-    return redirect()->route('admins.index')->with('status', 'Administrador eliminado correctamente.');
+    return view('admins.eventos', compact('admin', 'eventos'));
 }
 }

@@ -24,6 +24,18 @@
 
     <div class="overflow-hidden rounded-lg bg-white shadow">
         <div class="overflow-x-auto">
+        <form method="GET" action="{{ route('eventos.index') }}" class="mb-4 flex gap-x-4 items-center">
+    <input type="text" name="admin_nombre" value="{{ request('admin_nombre') }}" placeholder="Buscar admin por nombre"
+       class="rounded border px-2 py-1 text-sm">
+    <input type="text" name="admin_email" value="{{ request('admin_email') }}" placeholder="Buscar admin por email"
+       class="rounded border px-2 py-1 text-sm">
+    <button type="submit"
+       class="bg-blue-600 text-white px-3 py-1 rounded font-semibold hover:bg-blue-800">Buscar</button>
+    @if(request()->has('admin_nombre') || request()->has('admin_email'))
+        <a href="{{ route('eventos.index') }}"
+           class="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-400">Limpiar</a>
+    @endif
+</form>
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>

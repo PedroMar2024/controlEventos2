@@ -8,16 +8,26 @@
     $inicio  = $evento->hora_inicio ? substr($evento->hora_inicio, 0, 5) : '—';
     $cierre  = $evento->hora_cierre ? substr($evento->hora_cierre, 0, 5) : '—';
     $estado  = ucfirst($evento->estado ?? 'pendiente');
-    // $publico = $evento->publico ? 'Público' : 'Privado';   // REMOVIDO: no aplica al sistema
     $reing   = $evento->reingreso ? 'Con reingreso' : 'Sin reingreso';
     $admin   = optional($evento->adminPersona);
-
-    // Tickets y capacidad derivada
     $tickets = $evento->tickets ?? collect();
     $capacidadDerivada = $tickets->where('activo', true)->sum(fn($t) => (int)($t->cupo ?? 0));
   @endphp
 
   <div class="mx-auto max-w-3xl py-8">
+    <!-- AVISO ANTES DE ELIMINAR -->
+    @if (
+      auth()->check() &&
+      auth()->user()->persona &&
+      auth()->user()->persona->eventos()->count() === 1 &&
+      auth()->user()->persona->eventosComoAdmin()->where('eventos.id', $evento->id)->exists()
+    )
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-2">
+        <strong>Atención:</strong>
+        Vas a eliminar tu último evento como admin. Si continuás, serás eliminado del sistema y perderás acceso total.
+      </div>
+    @endif
+
     <!-- Tarjeta estilo entrada -->
     <div class="relative overflow-hidden rounded-2xl shadow-lg border bg-gradient-to-br from-indigo-50 to-white">
       <!-- Cabecera -->
@@ -67,8 +77,6 @@
           </div>
 
           <div class="flex flex-wrap gap-2 mt-2">
-            {{-- REMOVIDO: Público/Privado --}}
-            {{-- <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{{ $publico }}</span> --}}
             <span class="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">{{ $reing }}</span>
           </div>
 
@@ -108,26 +116,14 @@
             <p class="text-sm font-semibold text-gray-900">
               {{ $admin?->nombre ?: '—' }}
             </p>
-            {{-- REMOVIDO: email y DNI del admin --}}
-            {{-- <p class="text-xs text-gray-600">{{ $admin?->email }}</p>
-            @if($admin && $admin->dni)
-              <p class="text-xs text-gray-600">DNI {{ $admin->dni }}</p>
-            @endif --}}
-
-            {{-- REMOVIDO: bloque de Estado en lateral (ya aparece arriba) --}}
-            {{-- <div class="mt-4">
-              <p class="text-xs uppercase tracking-wide text-gray-500">Estado</p>
-              <p class="text-sm font-semibold text-gray-900">{{ $estado }}</p>
-            </div> --}}
 
             <div class="mt-6 space-y-2">
-            @can('update', $evento)
-                      <a href="{{ route('eventos.edit', $evento->id) }}"
-              class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-              Editar evento
-            </a>
-          @endcan
-            
+              @can('update', $evento)
+                <a href="{{ route('eventos.edit', $evento->id) }}"
+                  class="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                  Editar evento
+                </a>
+              @endcan
 
               @can('manageSubadmins', $evento)
                 <a href="{{ route('eventos.equipo.index', $evento) }}"
@@ -154,4 +150,24 @@
       </div>
     </div>
   </div>
+
+  <!-- Botón Eliminar -->
+  @can('delete', $evento)
+    <form action="{{ route('eventos.destroy', $evento->id) }}" method="POST"
+          onsubmit="return confirm(
+            @if(auth()->check() && auth()->user()->persona && auth()->user()->persona->eventos()->count() === 1 && auth()->user()->persona->eventosComoAdmin()->where('eventos.id', $evento->id)->exists())
+              'ATENCIÓN: este es tu último evento, vas a ser eliminado del sistema y perderás acceso. ¿Seguro de continuar?'
+            @else
+              '¿Estás seguro que deseas eliminar este evento?'
+            @endif
+          )"
+          class="mt-4">
+      @csrf
+      @method('DELETE')
+      <button type="submit"
+        class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-semibold">
+        Eliminar evento
+      </button>
+    </form>
+  @endcan
 @endsection

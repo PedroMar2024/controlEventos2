@@ -28,7 +28,6 @@ Route::middleware(['auth'])->group(function () {
     // Eventos
     Route::get('/eventos/create', [EventoController::class, 'create'])->name('eventos.create');
     Route::post('/eventos', [EventoController::class, 'store'])->name('eventos.store');
-
     Route::get('/eventos/{evento}', [EventoController::class, 'show'])->name('eventos.show');
 
     // Editar/Actualizar protegidos por Policy
@@ -46,6 +45,12 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:approve,evento')->name('eventos.aprobar');
     Route::post('/eventos/{evento}/cancelar', [EventoController::class, 'cancelar'])
         ->middleware('can:cancel,evento')->name('eventos.cancelar');
+
+    // =============== NUEVA RUTA para cambiar administrador del evento ===============
+    Route::post('/eventos/{evento}/cambiar-admin', [EventoController::class, 'cambiarAdmin'])
+        ->middleware('can:update,evento') // O poné 'role:superadmin' si querés solo superadmin
+        ->name('eventos.cambiar-admin');
+    // ================================================================================
 });
 
 require __DIR__.'/eventos_equipo.php';

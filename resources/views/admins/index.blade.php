@@ -5,7 +5,6 @@
 <div class="rounded-lg bg-white shadow p-6">
   <div class="flex items-center justify-between">
     <h1 class="text-base font-semibold">Administradores de eventos</h1>
-    <a href="{{ route('admins.create') }}" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Nuevo admin</a>
   </div>
 
   <div class="mt-3 overflow-x-auto">
@@ -28,17 +27,11 @@
                    class="inline-flex items-center px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-semibold">
                     Editar
                 </a>
-                <!-- Botón Eliminar -->
-                <form action="{{ route('admins.destroy', $admin) }}" method="POST" 
-                      onsubmit="return confirm('¿Estás seguro que deseas eliminar este admin?');"
-                      style="display:inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit"
-                            class="inline-flex items-center px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-semibold">
-                        Eliminar
-                    </button>
-                </form>
+                <!-- Botón Ver eventos relacionados -->
+                <a href="{{ route('admins.eventos', $admin) }}"
+                class="inline-flex items-center px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-semibold">
+                    Ver eventos
+                </a>
             </td>
         </tr>
         @endforeach

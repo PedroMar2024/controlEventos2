@@ -19,14 +19,30 @@ class EventoController extends Controller
         $this->middleware(['auth']);
     }
 
-    public function index()
+    public function index(Request $request)
 {
     $user = auth()->user();
 
     if ($user->hasRole('superadmin')) {
-        $eventos = \App\Models\Evento::with('personas') // CARGO LA LISTA DE PERSONAS/PERMISOS
-            ->orderBy('fecha_evento','desc')
-            ->paginate(15);
+        $query = \App\Models\Evento::with('personas')
+            ->orderBy('fecha_evento', 'desc');
+
+        // Agregamos el filtro por admin para superadmin
+        if ($request->filled('admin_nombre')) {
+            $query->whereHas('adminPersona', function($q) use ($request) {
+                $q->where('nombre', 'like', '%' . $request->admin_nombre . '%');
+            });
+        }
+        if ($request->filled('admin_email')) {
+            $query->whereHas('adminPersona', function($q) use ($request) {
+                $q->where('email', 'like', '%' . $request->admin_email . '%');
+            });
+        }
+        if ($request->filled('admin_persona_id')) {
+            $query->where('admin_persona_id', $request->admin_persona_id);
+        }
+
+        $eventos = $query->paginate(15);
     } else {
         $personaId = optional($user->persona)->id;
 
@@ -34,7 +50,7 @@ class EventoController extends Controller
                 $q->where('personas.id', $personaId)
                   ->whereIn('event_persona_roles.role', ['admin','subadmin']);
             })
-            ->with('personas') // Aca tambien CARGO la lista para poder chequear los permisos en la vista
+            ->with('personas')
             ->orderBy('fecha_evento','desc')
             ->paginate(15);
     }
@@ -68,7 +84,7 @@ class EventoController extends Controller
             'estado'        => ['nullable','in:pendiente,aprobado,finalizado'],
             'publico'       => ['nullable','boolean'],
             'reingreso'     => ['nullable','boolean'],
-            'tickets'            => ['nullable','array','max:5'],
+            'tickets'            => ['required','array','min:1','max:5'],
             'tickets.*.id'       => ['nullable','integer'],
             'tickets.*.nombre'   => ['nullable','string','max:100'],
             'tickets.*.precio'   => ['nullable','numeric','min:0'],
@@ -79,9 +95,10 @@ class EventoController extends Controller
 
         if ($isSuperadmin) {
             $rules = array_merge($rulesBase, [
-                'admin_email'  => ['required','email'],
-                'admin_nombre' => ['nullable','string','max:255'],
-                'admin_dni'    => ['nullable','string','max:32'],
+                'admin_email'    => ['required','email'],
+                'admin_nombre'   => ['nullable','string','max:255'],
+                'admin_apellido' => ['nullable','string','max:255'], // NUEVO
+                'admin_dni'      => ['nullable','string','max:32'],
             ]);
         } else {
             $rules = $rulesBase;
@@ -91,30 +108,49 @@ class EventoController extends Controller
 
         // === IDENTIFICAR Y OBTENER ADMIN/RESPONSABLE SEGÚN ROL ===
         if ($isSuperadmin) {
-            // Persona admin por email
-            $adminPersona = Persona::where('email', $request->string('admin_email'))->first();
+            // Buscar persona admin por email
+            $adminPersona = \App\Models\Persona::where('email', $request->string('admin_email'))->first();
 
             if (!$adminPersona) {
+                // Si no existe, validar todos los campos obligatorios
                 $request->validate([
-                    'admin_nombre' => ['required','string','max:255'],
-                    'admin_dni'    => ['required','string','max:32'],
+                    'admin_nombre'   => ['required','string','max:255'],
+                    'admin_apellido' => ['required','string','max:255'],
+                    'admin_dni'      => ['required','string','max:32'],
                 ]);
-                $adminPersona = Persona::create([
-                    'email'  => (string) $request->string('admin_email'),
-                    'nombre' => (string) $request->string('admin_nombre'),
-                    'dni'    => (string) $request->string('admin_dni'),
+                $adminPersona = \App\Models\Persona::create([
+                    'email'    => (string) $request->string('admin_email'),
+                    'nombre'   => (string) $request->string('admin_nombre'),
+                    'apellido' => (string) $request->string('admin_apellido'),
+                    'dni'      => (string) $request->string('admin_dni'),
                 ]);
+            } else {
+                // Si falta apellido o dni, obligar a completarlos
+                if (empty($adminPersona->apellido) || empty($adminPersona->dni)) {
+                    $request->validate([
+                        'admin_apellido' => ['required','string','max:255'],
+                        'admin_dni'      => ['required','string','max:32'],
+                    ]);
+                    $adminPersona->apellido = (string) $request->string('admin_apellido');
+                    $adminPersona->dni      = (string) $request->string('admin_dni');
+                    $adminPersona->save();
+                }
+                // Si el nombre está vacío, opcional para completar también
+                if (empty($adminPersona->nombre) && $request->filled('admin_nombre')) {
+                    $adminPersona->nombre = (string) $request->string('admin_nombre');
+                    $adminPersona->save();
+                }
             }
 
-            $adminUser = User::where('email', $adminPersona->email)->first();
+            $adminUser = \App\Models\User::where('email', $adminPersona->email)->first();
             if (!$adminUser) {
-                $adminUser = User::create([
+                $adminUser = \App\Models\User::create([
                     'name'       => $adminPersona->nombre ?: $adminPersona->email,
                     'email'      => $adminPersona->email,
-                    'password'   => bcrypt(Str::random(32)),
+                    'password'   => bcrypt(\Illuminate\Support\Str::random(32)),
                     'persona_id' => $adminPersona->id,
                 ]);
-                Password::sendResetLink(['email' => $adminUser->email]);
+                \Illuminate\Support\Facades\Password::sendResetLink(['email' => $adminUser->email]);
             } else {
                 if (!$adminUser->persona_id) {
                     $adminUser->persona_id = $adminPersona->id;
@@ -128,11 +164,11 @@ class EventoController extends Controller
             $adminUser = $user;
             $adminPersona = $user->persona;
             if (!$adminPersona) {
-                // Si el usuario admin no tiene persona, creala (raro, pero seguro)
-                $adminPersona = Persona::create([
+                $adminPersona = \App\Models\Persona::create([
                     'email'  => $user->email,
                     'nombre' => $user->name,
-                    'dni'    => '', // Podés ajustarlo si tenés otro campo
+                    'apellido' => '', // Podés agregar lógica para pedir apellido si querés
+                    'dni'    => '',   // Podés agregar lógica para pedir dni si querés
                 ]);
                 $user->persona_id = $adminPersona->id;
                 $user->save();
@@ -145,7 +181,7 @@ class EventoController extends Controller
         $data['reingreso'] = $request->boolean('reingreso');
 
         // Crear evento
-        $evento = new Evento();
+        $evento = new \App\Models\Evento();
         foreach ($evento->getFillable() as $col) {
             if (array_key_exists($col, $data)) {
                 $evento->{$col} = $data[$col];
@@ -217,7 +253,7 @@ public function update(Request $request, Evento $evento)
             'reingreso'     => ['nullable','boolean'],
 
             // Tickets (máximo 5)
-            'tickets'            => ['nullable','array','max:5'],
+            'tickets'            => ['required','array','min:1','max:5'],
             'tickets.*.id'       => ['nullable','integer'],
             'tickets.*.nombre'   => ['nullable','string','max:100'],
             'tickets.*.precio'   => ['nullable','numeric','min:0'],
@@ -225,6 +261,17 @@ public function update(Request $request, Evento $evento)
             'tickets.*.activo'   => ['nullable','boolean'],
             'tickets.*._destroy' => ['nullable','boolean'],
         ]);
+        // VALIDACIÓN REAL sobre los "activos"
+            $tickets = collect($request->input('tickets', []))
+            ->filter(fn($t) =>
+                (empty($t['_destroy']) || $t['_destroy'] === "0")
+                && isset($t['nombre']) && trim($t['nombre']) !== ''
+            );
+            if ($tickets->count() < 1) {
+            return back()->withInput()->withErrors([
+                'tickets' => 'Debe dejar al menos un tipo de entrada activo.'
+            ]);
+            }
 
         $validated['publico']   = $request->boolean('publico');
         $validated['reingreso'] = $request->boolean('reingreso');
@@ -244,6 +291,7 @@ public function update(Request $request, Evento $evento)
             'before' => $before,
             'input'  => $request->input('provincia'),
         ]);
+        $user = auth()->user();
         if (!$user->hasRole('superadmin')) {
             $evento->estado = $evento->getOriginal('estado');
         }
@@ -271,22 +319,57 @@ public function update(Request $request, Evento $evento)
 }
 public function destroy(Evento $evento)
 {
-    // Guardar las personas que estaban asociadas al evento ANTES de eliminarlo
     $personas = $evento->personas()->get();
 
-    // Eliminar el evento (esto borra los pivotes evento_persona)
+    \Log::debug('DESTROY: Eliminando evento', ['evento_id' => $evento->id]);
     $evento->delete();
+    \Log::debug('DESTROY: Evento eliminado', ['evento_id' => $evento->id]);
 
-    // Para cada persona, comprobar si sigue en algún evento
     foreach ($personas as $persona) {
-        // Contar cuántos eventos tiene la persona después de eliminar este
-        $eventosRestantes = $persona->eventos()->count();
-        if ($eventosRestantes === 0) {
-            $persona->delete(); // Elimina a la persona si ya no está en ningún evento
+        $user = $persona->user;
+
+        $quedaEnEventos = \DB::table('event_persona_roles')
+            ->where('persona_id', $persona->id)
+            ->whereIn('role', ['admin', 'subadmin', 'invitado'])
+            ->exists();
+
+        \Log::debug('DESTROY: Persona check', [
+            'persona_id' => $persona->id,
+            'quedaEnEventos' => $quedaEnEventos,
+            'user_id' => $user ? $user->id : null,
+        ]);
+
+        if (!$quedaEnEventos) {
+            $persona->delete();
+            \Log::debug('DESTROY: Persona eliminada', ['persona_id' => $persona->id]);
+
+            if ($user) {
+                // Antes de borrar roles:
+                \Log::debug('DESTROY: Roles antes de borrar', [
+                    'roles' => $user->getRoleNames()
+                ]);
+                $user->syncRoles([]);
+                $rows = \DB::table('model_has_roles')
+                    ->where('model_id', $user->id)
+                    ->where('model_type', get_class($user))
+                    ->delete();
+                \Log::debug('DESTROY: Model_has_roles elimina filas', ['user_id' => $user->id, 'rows_deleted' => $rows]);
+
+                // Borrar user:
+                $deleted = \DB::table('users')->where('id', $user->id)->delete();
+                \Log::debug('DESTROY: Usuario eliminado', [
+                    'user_id' => $user->id,
+                    'deleted_rows' => $deleted,
+                    'usuarios_restantes' => \DB::table('users')->where('id', $user->id)->count()
+                ]);
+            }
+        } else {
+            \Log::debug('DESTROY: Persona NO eliminada por eventos pendientes', ['persona_id' => $persona->id]);
         }
     }
 
-    return redirect()->route('eventos.index')->with('success', 'Evento y personas sin eventos, eliminados correctamente.');
+    return redirect()->route('eventos.index')
+        ->with('success', 'Evento y personas/usuarios eliminados si correspondía.');
 }
 
     // Opcionales si existen en tus rutas:
@@ -355,5 +438,71 @@ private function computeCapacityFromTickets(Evento $evento): int
     return (int) $evento->tickets
         ->where('activo', true)
         ->sum(function ($t) { return (int)($t->cupo ?? 0); });
+}
+public function cambiarAdmin(Request $request, Evento $evento)
+{
+   
+    $request->validate([
+        'admin_email'    => ['required', 'email'],
+        'admin_nombre'   => ['required', 'string', 'max:255'],
+        'admin_apellido' => ['required', 'string', 'max:255'],
+        'admin_dni'      => ['required', 'string', 'max:32'],
+    ]);
+
+    // Paso 2: Chequear si la persona ya es admin de este evento
+    $currentAdmin = $evento->personas()->wherePivot('role', 'admin')->first();
+
+    if ($currentAdmin && strtolower($currentAdmin->email) === strtolower($request->admin_email)) {
+        // Si el mismo admin, abortar y mostrar error
+        return back()->withErrors([
+            'admin_email' => 'La persona ya es administrador de este evento. Elegí otra para el cambio.'
+        ])->withInput();
+    }
+
+    // Paso 3: Buscar o crear persona
+    $persona = \App\Models\Persona::firstOrCreate(
+        ['email' => $request->admin_email],
+        [
+            'nombre'   => $request->admin_nombre,
+            'apellido' => $request->admin_apellido,
+            'dni'      => $request->admin_dni,
+        ]
+    );
+
+    // Paso 4: Buscar o crear user
+    $user = \App\Models\User::firstOrCreate(
+        ['email' => $request->admin_email],
+        [
+            'name'       => $persona->nombre . ' ' . $persona->apellido,
+            'password'   => bcrypt(\Illuminate\Support\Str::random(32)),
+            'persona_id' => $persona->id,
+        ]
+    );
+    $user->assignRole('admin_evento'); // Asegura rol admin_evento
+
+    // Paso 5: Sacar admin anterior de este evento (solo pivote)
+    \DB::table('event_persona_roles')
+        ->where('evento_id', $evento->id)
+        ->where('role', 'admin')
+        ->delete();
+
+    // Paso 6: Asignar el nuevo admin en el pivote
+    \DB::table('event_persona_roles')->updateOrInsert(
+        [
+            'evento_id'   => $evento->id,
+            'persona_id'  => $persona->id,
+            'role'        => 'admin'
+        ],
+        [] // otros campos del pivot si necesitas
+    );
+
+    // Paso 7: Mandar reset link si el user era nuevo
+    if ($user->wasRecentlyCreated) {
+        \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
+    }
+
+    // Paso 8: (Opcional) Revisar que el admin anterior no quede huérfano (sin eventos ni roles) y decidir si lo archivás.
+
+    return redirect()->route('eventos.show', $evento)->with('success', 'Administrador de evento cambiado correctamente.');
 }
 }

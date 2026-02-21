@@ -29,21 +29,21 @@
 
         <div class="col-span-4">
           <label class="block text-xs font-medium text-gray-700">Nombre</label>
-          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm"
+          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm ticket-input"
                  name="tickets[{{ $idx }}][nombre]" maxlength="100"
                  value="{{ $t['nombre'] ?? '' }}">
         </div>
 
         <div class="col-span-3">
           <label class="block text-xs font-medium text-gray-700">Precio</label>
-          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm"
+          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm ticket-input"
                  name="tickets[{{ $idx }}][precio]" type="number" step="0.01" min="0"
                  value="{{ isset($t['precio']) ? $t['precio'] : '' }}">
         </div>
 
         <div class="col-span-3">
           <label class="block text-xs font-medium text-gray-700">Cupo (opcional)</label>
-          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm"
+          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm ticket-input"
                  name="tickets[{{ $idx }}][cupo]" type="number" min="0"
                  value="{{ $t['cupo'] ?? '' }}">
         </div>
@@ -68,6 +68,18 @@
   </div>
 </div>
 
+<!-- MODAL de confirmación de ticket -->
+<div id="ticket-confirm-modal" class="hidden fixed top-0 left-0 w-full h-full flex items-center justify-center bg-gray-900 bg-opacity-50 z-50">
+  <div class="bg-white rounded shadow p-6">
+    <h2 class="text-lg font-semibold mb-2">Ticket confirmado</h2>
+    <p class="mb-4">¿Deseás agregar otro tipo de ticket o guardar el evento?</p>
+    <div class="flex gap-4">
+      <button type="button" id="modal-add-ticket" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Agregar otro ticket</button>
+      <button type="button" id="modal-save-event" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar evento</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   const container = document.getElementById('tickets-container');
@@ -85,19 +97,19 @@
 
         <div class="col-span-4">
           <label class="block text-xs font-medium text-gray-700">Nombre</label>
-          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm"
+          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm ticket-input"
                  name="tickets[${idx}][nombre]" maxlength="100">
         </div>
 
         <div class="col-span-3">
           <label class="block text-xs font-medium text-gray-700">Precio</label>
-          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm"
+          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm ticket-input"
                  name="tickets[${idx}][precio]" type="number" step="0.01" min="0">
         </div>
 
         <div class="col-span-3">
           <label class="block text-xs font-medium text-gray-700">Cupo (opcional)</label>
-          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm"
+          <input class="mt-1 block w-full rounded-md border-gray-300 text-sm ticket-input"
                  name="tickets[${idx}][cupo]" type="number" min="0">
         </div>
 
@@ -121,7 +133,7 @@
     row.querySelectorAll('input,select,textarea').forEach(el => {
       const name = el.getAttribute('name') || '';
       if (!name.endsWith('[_destroy]')) {
-        el.disabled = true;
+        el.readOnly = true;
         el.removeAttribute('required');
       }
     });
@@ -145,6 +157,39 @@
       disableRowInputs(row);
       row.style.display = 'none';
     }
+  });
+
+  // Detectar Enter en cualquiera de los inputs de tickets
+  container?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target.closest('.ticket-row')) {
+      e.preventDefault();
+
+      // Confirmar la fila de ticket (readonly)
+      const row = e.target.closest('.ticket-row');
+      disableRowInputs(row);
+
+      // Mostrar el modal
+      mostrarVentanaDecision();
+    }
+  });
+
+  // MODAL lógica
+  function mostrarVentanaDecision() {
+    const modal = document.getElementById('ticket-confirm-modal');
+    modal.classList.remove('hidden');
+    document.getElementById('modal-add-ticket').focus();
+  }
+
+  document.getElementById('modal-add-ticket').addEventListener('click', () => {
+    document.getElementById('ticket-confirm-modal').classList.add('hidden');
+    addBtn.click();
+  });
+
+  document.getElementById('modal-save-event').addEventListener('click', () => {
+    document.getElementById('ticket-confirm-modal').classList.add('hidden');
+    // Enviá el formulario principal
+    const form = container.closest('form');
+    form.submit();
   });
 
   // Antes de enviar el formulario: deshabilitar filas eliminadas o vacías,

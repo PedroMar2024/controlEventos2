@@ -49,6 +49,13 @@
                                 @error('admin_nombre') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                             </div>
                             <div class="md:col-span-1">
+                                <label class="block text-sm font-medium text-gray-700">Apellido</label>
+                                <input type="text" name="admin_apellido" id="admin_apellido" value="{{ old('admin_apellido') }}"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
+                                    placeholder="Apellido del administrador" required>
+                                @error('admin_apellido') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="md:col-span-1">
                                 <label class="block text-sm font-medium text-gray-700">DNI</label>
                                 <input type="text" name="admin_dni" id="admin_dni" value="{{ old('admin_dni') }}"
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
@@ -179,55 +186,65 @@
 
     {{-- El script se mantiene igual, ya que solo aplica si está la sección visible --}}
     @role('superadmin')
-    <script>
-      async function lookupPersonaByEmail(email) {
-        const status = document.getElementById('admin_email_status');
-        const nombre = document.getElementById('admin_nombre');
-        const dni    = document.getElementById('admin_dni');
-        const localidad = document.getElementById('localidad');
-        const provincia = document.getElementById('provincia');
+<script>
+  async function lookupPersonaByEmail(email) {
+    const status = document.getElementById('admin_email_status');
+    const nombre = document.getElementById('admin_nombre');
+    const dni    = document.getElementById('admin_dni');
+    const apellido = document.getElementById('admin_apellido');
+    const localidad = document.getElementById('localidad');
+    const provincia = document.getElementById('provincia');
 
-        status.textContent = '';
+    status.textContent = '';
+    nombre.disabled = false;
+    dni.disabled = false;
+    apellido.disabled = false;
+
+    if (!email) return;
+
+    status.textContent = 'Buscando…';
+    try {
+      const url = '{{ route('personas.byEmail') }}' + '?email=' + encodeURIComponent(email);
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
+      const data = await res.json();
+
+      if (data.found) {
+        status.textContent = 'Persona: ' + 
+          (data.nombre ?? '') + 
+          (data.apellido ? ' ' + data.apellido : '') +
+          (data.dni ? ' (DNI ' + data.dni + ')' : '');
+        
+        nombre.value = data.nombre ?? '';
+        nombre.disabled = true;
+        apellido.value = data.apellido ?? '';
+        apellido.disabled = true;
+        dni.value    = data.dni ?? '';
+        dni.disabled = true;
+
+        // Limpia posibles autofills del navegador
+        if (localidad) localidad.value = '';
+        if (provincia) provincia.value = '';
+      } else {
+        status.textContent = 'No existe. Completa Nombre, Apellido y DNI.';
+        nombre.value = '';
         nombre.disabled = false;
+        apellido.value = '';
+        apellido.disabled = false;
+        dni.value    = '';
         dni.disabled = false;
 
-        if (!email) return;
-
-        status.textContent = 'Buscando…';
-        try {
-          const url = '{{ route('personas.byEmail') }}' + '?email=' + encodeURIComponent(email);
-          const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
-          const data = await res.json();
-
-          if (data.found) {
-            status.textContent = 'Persona: ' + (data.nombre ?? '') + (data.dni ? ' (DNI ' + data.dni + ')' : '');
-            nombre.value = data.nombre ?? '';
-            dni.value    = data.dni ?? '';
-            nombre.disabled = true;
-            dni.disabled    = true;
-
-            // Limpia posibles autofills del navegador
-            if (localidad) localidad.value = '';
-            if (provincia) provincia.value = '';
-          } else {
-            status.textContent = 'No existe. Completa Nombre y DNI.';
-            nombre.value = '';
-            dni.value    = '';
-            nombre.disabled = false;
-            dni.disabled    = false;
-
-            if (localidad) localidad.value = '';
-            if (provincia) provincia.value = '';
-          }
-        } catch (e) {
-          status.textContent = 'Error buscando email.';
-        }
+        if (localidad) localidad.value = '';
+        if (provincia) provincia.value = '';
       }
+    } catch (e) {
+      status.textContent = 'Error buscando email.';
+    }
+  }
 
-      document.getElementById('admin_email').addEventListener('blur', (e) => {
-        document.getElementById('create-event-form')?.setAttribute('autocomplete', 'off');
-        lookupPersonaByEmail(e.target.value);
-      });
-    </script>
-    @endrole
+  document.getElementById('admin_email').addEventListener('blur', (e) => {
+    document.getElementById('create-event-form')?.setAttribute('autocomplete', 'off');
+    lookupPersonaByEmail(e.target.value);
+  });
+</script>
+@endrole
 @endsection

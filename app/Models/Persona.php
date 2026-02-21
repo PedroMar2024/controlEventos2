@@ -11,10 +11,10 @@ class Persona extends Model
     ];
 
     // Un persona puede tener múltiples usuarios (si lo necesitas) o solo uno.
-    public function users()
-    {
-        return $this->hasMany(User::class);
-    }
+    public function user()
+{
+    return $this->hasOne(User::class, 'persona_id');
+}
 
     // Relación pivot con eventos y rol por evento
     public function eventos()
