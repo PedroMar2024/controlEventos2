@@ -112,7 +112,118 @@
                         @error('provincia') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                       </div>
                     </div>
+                   <!-- Bloque de Admin Actual -->
+<div class="border bg-gray-100 rounded p-4 mb-5">
+    <h3 class="font-bold mb-2">Administrador del evento</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label>Email:</label>
+            <input type="email" name="admin_email" id="admin_email" value="{{ $evento->adminPersona->email ?? '' }}" class="w-full rounded border" readonly>
+        </div>
+        <div>
+            <label>Nombre:</label>
+            <input type="text" name="admin_nombre" id="admin_nombre" value="{{ $evento->adminPersona->nombre ?? '' }}" class="w-full rounded border">
+        </div>
+        <div>
+            <label>Apellido:</label>
+            <input type="text" name="admin_apellido" id="admin_apellido" value="{{ $evento->adminPersona->apellido ?? '' }}" class="w-full rounded border">
+        </div>
+        <div>
+            <label>DNI:</label>
+            <input type="text" name="admin_dni" id="admin_dni" value="{{ $evento->adminPersona->dni ?? '' }}" class="w-full rounded border">
+        </div>
+    </div>
 
+    {{-- Bloque visible solo para superadmin --}}
+    @role('superadmin')
+        <small class="block text-gray-500 mt-2">
+            Podés cambiar los datos del administrador actual.<br>
+            Si querés poner un nuevo admin, usá el botón de abajo.
+        </small>
+        <!-- Botón para abrir modal de cambio de admin -->
+        <button type="button" onclick="abrirModalAdmin()" class="mt-4 bg-indigo-600 text-white rounded px-4 py-2">
+            Cambiar Administrador
+        </button>
+    @endrole
+</div>
+
+<!-- Ventana flotante para cambio de admin -->
+<div id="cambiar-admin-modal" style="display:none;" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+    <div class="bg-white rounded-lg p-6 shadow-lg w-full max-w-md relative">
+        <button type="button" onclick="cerrarModalAdmin()"
+            class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl">×</button>
+        <h3 class="text-lg font-bold mb-3">Cambiar Administrador</h3>
+        <label>Email del nuevo admin:</label>
+        <input type="email" id="nuevo_admin_email" class="w-full rounded border mb-2" onblur="buscarNuevoAdmin(event)" autocomplete="off">
+        <div id="nuevo-admin-campos" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label>Nombre:</label>
+                <input type="text" id="nuevo_admin_nombre" class="w-full rounded border" readonly>
+            </div>
+            <div>
+                <label>Apellido:</label>
+                <input type="text" id="nuevo_admin_apellido" class="w-full rounded border" readonly>
+            </div>
+            <div>
+                <label>DNI:</label>
+                <input type="text" id="nuevo_admin_dni" class="w-full rounded border" readonly>
+            </div>
+        </div>
+        <div class="mt-4 flex gap-2">
+            <button type="button" class="bg-blue-600 text-white rounded px-4 py-2" onclick="actualizarAdminEnForm()">Confirmar</button>
+            <button type="button" class="bg-gray-200 text-gray-800 rounded px-4 py-2" onclick="cerrarModalAdmin()">Cancelar</button>
+        </div>
+        <small id="nuevo-admin-msg" class="block text-xs text-gray-500 mt-2"></small>
+    </div>
+</div>
+<script>
+// Para evitar problemas de opacidad y posición
+function abrirModalAdmin() {
+    document.getElementById('cambiar-admin-modal').style.display = 'flex';
+}
+function cerrarModalAdmin() {
+    document.getElementById('cambiar-admin-modal').style.display = 'none';
+}
+async function buscarNuevoAdmin(event) {
+    const email = document.getElementById('nuevo_admin_email').value;
+    const nombre = document.getElementById('nuevo_admin_nombre');
+    const apellido = document.getElementById('nuevo_admin_apellido');
+    const dni = document.getElementById('nuevo_admin_dni');
+    const msg = document.getElementById('nuevo-admin-msg');
+    if (!email) return;
+
+    try {
+        const res = await fetch(`/personas/by-email?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+        if (data && data.persona) {
+            nombre.value = data.persona.nombre;
+            apellido.value = data.persona.apellido;
+            dni.value = data.persona.dni;
+            nombre.readOnly = true;
+            apellido.readOnly = true;
+            dni.readOnly = true;
+            msg.innerText = "El email ya existe, se va a usar este admin (los datos no se pueden editar).";
+        } else {
+            nombre.value = "";
+            apellido.value = "";
+            dni.value = "";
+            nombre.readOnly = false;
+            apellido.readOnly = false;
+            dni.readOnly = false;
+            msg.innerText = "El email no existe en el sistema, completá los datos y se creará una nueva ficha.";
+        }
+    } catch {
+        msg.innerText = "Error conectando con el sistema.";
+    }
+}
+function actualizarAdminEnForm() {
+    document.getElementById('admin_email').value = document.getElementById('nuevo_admin_email').value;
+    document.getElementById('admin_nombre').value = document.getElementById('nuevo_admin_nombre').value;
+    document.getElementById('admin_apellido').value = document.getElementById('nuevo_admin_apellido').value;
+    document.getElementById('admin_dni').value = document.getElementById('nuevo_admin_dni').value;
+    cerrarModalAdmin();
+}
+</script>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="flex items-center">
                             <input type="checkbox" id="publico" name="publico" value="1" {{ old('publico', $evento->publico) ? 'checked' : '' }}

@@ -105,8 +105,8 @@
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700">Fecha del evento</label>
-                            <input type="date" name="fecha_evento" value="{{ old('fecha_evento') }}"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                            <input type="date" name="fecha_evento" min="{{ \Carbon\Carbon::now()->format('Y-m-d') }}"
+                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">    
                             @error('fecha_evento') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>

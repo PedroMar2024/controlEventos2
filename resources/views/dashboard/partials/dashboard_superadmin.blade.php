@@ -1,20 +1,10 @@
 @php
     use Carbon\Carbon;
+    $totalEventos = \App\Models\Evento::count();
+    $cantEventosPendientes = \App\Models\Evento::where('estado', 'pendiente')->count();
+    $cantEventosAprobados = \App\Models\Evento::where('estado', 'aprobado')->count();
 
-    // Traer los 5 primeros administradores vinculados a eventos
-    $primerosAdmins = \App\Models\Persona::whereIn('id',
-        \DB::table('event_persona_roles')
-            ->where('role', 'admin')
-            ->distinct()
-            ->pluck('persona_id')
-            ->take(5)
-    )->get();
-    $totalAdminsEvento = \DB::table('event_persona_roles')
-        ->where('role', 'admin')
-        ->distinct('persona_id')
-        ->count('persona_id');
-
-    // Traer todos los eventos, calcular días faltantes y filtrar a solo los próximos (o hoy)
+    // Próximos eventos (los 5 más cercanos)
     $primerosEventos = \App\Models\Evento::orderBy('fecha_evento','asc')
         ->get()
         ->map(function($ev) {
@@ -28,33 +18,19 @@
         ->take(5)
         ->values();
 
-    $totalEventos = \App\Models\Evento::count();
     $fmtFecha = fn($ev) => optional($ev->fecha_evento)->format('d/m/Y') ?: '—';
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-
-    <!-- Card: MIS ADMINISTRADORES -->
+    <!-- Card: RESUMEN DEL SISTEMA -->
     <div class="bg-white rounded-xl shadow-md p-4 flex flex-col">
-        <div class="flex justify-between items-center mb-2">
-            <span class="text-2xl text-blue-700 font-extrabold">Administradores</span>
-            <span class="text-lg font-semibold text-blue-900">{{ $totalAdminsEvento }}</span>
-        </div>
+        <div class="text-xl text-gray-600 font-extrabold mb-2">Resumen</div>
         <ul class="flex flex-col gap-2 mb-2">
-            @forelse($primerosAdmins as $admin)
-                <li class="flex items-center bg-blue-50 rounded px-2 py-1">
-                    <span class="text-sm font-medium text-gray-800 truncate text-left">
-                        {{ $admin->nombre ?? '' }} {{ $admin->apellido ?? '' }}
-                    </span>
-                </li>
-            @empty
-                <li class="py-2 text-xs text-gray-400 text-center">Sin administradores vinculados</li>
-            @endforelse
+            <li>Total eventos: <span class="font-bold text-indigo-700">{{ $totalEventos }}</span></li>
+            <li>Eventos pendientes: <span class="font-bold text-yellow-600">{{ $cantEventosPendientes }}</span></li>
+            <li>Eventos aprobados: <span class="font-bold text-green-700">{{ $cantEventosAprobados }}</span></li>
         </ul>
-        <a href="{{ route('admins.index') }}"
-           class="mt-auto text-xs font-medium px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors text-center self-end w-full">
-           Gestionar
-        </a>
+        <div class="mt-auto text-xs text-gray-400">Actualizado al {{ now()->format('d/m/Y H:i') }}</div>
     </div>
 
     <!-- Card: PRÓXIMOS EVENTOS -->

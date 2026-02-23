@@ -15,18 +15,7 @@
   @endphp
 
   <div class="mx-auto max-w-3xl py-8">
-    <!-- AVISO ANTES DE ELIMINAR -->
-    @if (
-      auth()->check() &&
-      auth()->user()->persona &&
-      auth()->user()->persona->eventos()->count() === 1 &&
-      auth()->user()->persona->eventosComoAdmin()->where('eventos.id', $evento->id)->exists()
-    )
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-2">
-        <strong>Atención:</strong>
-        Vas a eliminar tu último evento como admin. Si continuás, serás eliminado del sistema y perderás acceso total.
-      </div>
-    @endif
+    
 
     <!-- Tarjeta estilo entrada -->
     <div class="relative overflow-hidden rounded-2xl shadow-lg border bg-gradient-to-br from-indigo-50 to-white">

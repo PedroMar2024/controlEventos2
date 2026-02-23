@@ -51,8 +51,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:update,evento') // O poné 'role:superadmin' si querés solo superadmin
         ->name('eventos.cambiar-admin');
     // ================================================================================
-});
 
+    // NO CARGAR MAS RUTAS DE ADMINS:
+    // require __DIR__.'/admins.php';
+});
 require __DIR__.'/eventos_equipo.php';
 require __DIR__.'/auth.php';
-require __DIR__.'/admins.php';
+// require __DIR__.'/admins.php'; // <--- Comentada o eliminada

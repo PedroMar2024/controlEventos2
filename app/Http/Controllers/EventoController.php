@@ -75,7 +75,11 @@ class EventoController extends Controller
         $rulesBase = [
             'nombre'        => ['required','string','max:255'],
             'descripcion'   => ['nullable','string'],
-            'fecha_evento'  => ['nullable','date'],
+            'fecha_evento' => [
+                                    'required',
+                                    'date',
+                                    'after_or_equal:' . now()->format('Y-m-d'), // Sólo hoy o futuro
+                                ],
             'hora_inicio'   => ['nullable','date_format:H:i'],
             'hora_cierre'   => ['nullable','date_format:H:i'],
             'ubicacion'     => ['nullable','string','max:255'],
@@ -235,14 +239,17 @@ public function edit(Evento $evento)
 
 public function update(Request $request, Evento $evento)
 {
-    // El middleware ya chequeó la policy y si pasa, puede actualizar.
     Log::debug('Eventos@update payload', $request->except('_token'));
 
     try {
         $validated = $request->validate([
             'nombre'        => ['required','string','max:255'],
             'descripcion'   => ['nullable','string'],
-            'fecha_evento'  => ['required','date'],
+                                            'fecha_evento' => [
+                                    'required',
+                                    'date',
+                                    'after_or_equal:' . now()->format('Y-m-d'), // Sólo hoy o futuro
+                                ],
             'hora_inicio'   => ['nullable','date_format:H:i'],
             'hora_cierre'   => ['nullable','date_format:H:i'],
             'ubicacion'     => ['nullable','string','max:255'],
@@ -251,7 +258,6 @@ public function update(Request $request, Evento $evento)
             'estado'        => ['required','in:pendiente,aprobado,finalizado'],
             'publico'       => ['boolean'],
             'reingreso'     => ['nullable','boolean'],
-
             // Tickets (máximo 5)
             'tickets'            => ['required','array','min:1','max:5'],
             'tickets.*.id'       => ['nullable','integer'],
@@ -260,18 +266,24 @@ public function update(Request $request, Evento $evento)
             'tickets.*.cupo'     => ['nullable','integer','min:0'],
             'tickets.*.activo'   => ['nullable','boolean'],
             'tickets.*._destroy' => ['nullable','boolean'],
+            // Datos admin
+            'admin_email'    => ['required','email'],
+            'admin_nombre'   => ['required','string','max:255'],
+            'admin_apellido' => ['required','string','max:255'],
+            'admin_dni'      => ['required','string','max:255'],
         ]);
+
         // VALIDACIÓN REAL sobre los "activos"
-            $tickets = collect($request->input('tickets', []))
+        $tickets = collect($request->input('tickets', []))
             ->filter(fn($t) =>
                 (empty($t['_destroy']) || $t['_destroy'] === "0")
                 && isset($t['nombre']) && trim($t['nombre']) !== ''
             );
-            if ($tickets->count() < 1) {
+        if ($tickets->count() < 1) {
             return back()->withInput()->withErrors([
                 'tickets' => 'Debe dejar al menos un tipo de entrada activo.'
             ]);
-            }
+        }
 
         $validated['publico']   = $request->boolean('publico');
         $validated['reingreso'] = $request->boolean('reingreso');
@@ -302,6 +314,79 @@ public function update(Request $request, Evento $evento)
             'dirty' => $evento->getChanges(),
         ]);
 
+        // ================= LÓGICA ADMIN =================
+        $adminPersona = $evento->adminPersona;
+        $adminEmailActual = $adminPersona ? $adminPersona->email : null;
+        $adminEmailNuevo  = $validated['admin_email'];
+        $huboCambioAdmin = $adminEmailActual !== $adminEmailNuevo;
+
+        // Chequear permisos SOLO si hubo cambio de admin (no para updates comunes)
+        if ($huboCambioAdmin && !$user->hasRole('superadmin')) {
+            return response()->view('eventos.no_superadmin', [
+                'evento' => $evento,
+                'mensaje' => 'Solo el superadmin puede cambiar el administrador del evento.',
+            ]);
+        }
+
+        // Si email no cambia, actualiza datos de admin actual
+        if ($adminPersona && !$huboCambioAdmin) {
+            $adminPersona->nombre   = $validated['admin_nombre'];
+            $adminPersona->apellido = $validated['admin_apellido'];
+            $adminPersona->dni      = $validated['admin_dni'];
+            $adminPersona->save();
+        }
+        // Si email cambia, cambiar admin del evento
+        else if ($huboCambioAdmin) {
+            // Buscar por email nuevo
+            $personaNueva = \App\Models\Persona::where('email', $validated['admin_email'])->first();
+            // Si no existe, crear persona y user
+            if (!$personaNueva) {
+                $personaNueva = \App\Models\Persona::create([
+                    'nombre'   => $validated['admin_nombre'],
+                    'apellido' => $validated['admin_apellido'],
+                    'dni'      => $validated['admin_dni'],
+                    'email'    => $validated['admin_email'],
+                ]);
+                $userNuevo = \App\Models\User::create([
+                    'name'       => $validated['admin_nombre'] . ' ' . $validated['admin_apellido'],
+                    'email'      => $validated['admin_email'],
+                    'persona_id' => $personaNueva->id,
+                    'password'   => bcrypt(\Illuminate\Support\Str::random(10)),
+                ]);
+                $userNuevo->assignRole('admin_evento');
+                \Illuminate\Support\Facades\Password::sendResetLink(['email' => $userNuevo->email]);
+            }
+            // Vincular nuevo admin al evento
+            $evento->admin_persona_id = $personaNueva->id;
+            $evento->save();
+
+            // Cambiar relación en tabla pivot (event_persona_roles)
+            $evento->personas()->detach($adminPersona->id); // Saca admin anterior
+            $evento->personas()->attach($personaNueva->id, ['role' => 'admin']);
+
+            // Chequear si admin anterior queda huérfano
+            $adminViejo = $adminPersona;
+            $quedaEnEventos = \DB::table('event_persona_roles')
+                ->where('persona_id', $adminViejo->id)
+                ->whereIn('role', ['admin', 'subadmin', 'invitado'])
+                ->exists();
+
+            $userViejo = $adminViejo->user;
+
+            if (!$quedaEnEventos) {
+                $adminViejo->delete();
+                if ($userViejo) {
+                    $userViejo->syncRoles([]);
+                    \DB::table('model_has_roles')
+                        ->where('model_id', $userViejo->id)
+                        ->where('model_type', get_class($userViejo))
+                        ->delete();
+                    \DB::table('users')->where('id', $userViejo->id)->delete();
+                }
+            }
+        }
+        // ================================================
+
         // Tickets/capacidad
         $this->syncTickets($evento, $request->input('tickets', []));
         $evento->capacidad = $this->computeCapacityFromTickets($evento);
@@ -319,77 +404,44 @@ public function update(Request $request, Evento $evento)
 }
 public function destroy(Evento $evento)
 {
+    // 1. GUARDÁ personas antes del delete
     $personas = $evento->personas()->get();
 
     \Log::debug('DESTROY: Eliminando evento', ['evento_id' => $evento->id]);
+    $eventoId = $evento->id;
     $evento->delete();
-    \Log::debug('DESTROY: Evento eliminado', ['evento_id' => $evento->id]);
+    \Log::debug('DESTROY: Evento eliminado', ['evento_id' => $eventoId]);
 
-    foreach ($personas as $persona) {
-        $user = $persona->user;
+    // 2. LLAMADA AL SERVICE: PASÁ $eventoId!!!
+    $eliminados = \App\Services\PersonaCleanupService::cleanup($personas, $eventoId);
 
-        $quedaEnEventos = \DB::table('event_persona_roles')
-            ->where('persona_id', $persona->id)
-            ->whereIn('role', ['admin', 'subadmin', 'invitado'])
-            ->exists();
-
-        \Log::debug('DESTROY: Persona check', [
-            'persona_id' => $persona->id,
-            'quedaEnEventos' => $quedaEnEventos,
-            'user_id' => $user ? $user->id : null,
-        ]);
-
-        if (!$quedaEnEventos) {
-            $persona->delete();
-            \Log::debug('DESTROY: Persona eliminada', ['persona_id' => $persona->id]);
-
-            if ($user) {
-                // Antes de borrar roles:
-                \Log::debug('DESTROY: Roles antes de borrar', [
-                    'roles' => $user->getRoleNames()
-                ]);
-                $user->syncRoles([]);
-                $rows = \DB::table('model_has_roles')
-                    ->where('model_id', $user->id)
-                    ->where('model_type', get_class($user))
-                    ->delete();
-                \Log::debug('DESTROY: Model_has_roles elimina filas', ['user_id' => $user->id, 'rows_deleted' => $rows]);
-
-                // Borrar user:
-                $deleted = \DB::table('users')->where('id', $user->id)->delete();
-                \Log::debug('DESTROY: Usuario eliminado', [
-                    'user_id' => $user->id,
-                    'deleted_rows' => $deleted,
-                    'usuarios_restantes' => \DB::table('users')->where('id', $user->id)->count()
-                ]);
-            }
-        } else {
-            \Log::debug('DESTROY: Persona NO eliminada por eventos pendientes', ['persona_id' => $persona->id]);
-        }
+    $mensaje = 'Evento y personas/usuarios eliminados si correspondía.';
+    if (!empty($eliminados)) {
+        $mensaje .= ' Es probable que las siguientes personas hayan sido eliminadas del sistema por ser su último evento: ' . implode(', ', $eliminados) . '.';
     }
 
     return redirect()->route('eventos.index')
-        ->with('success', 'Evento y personas/usuarios eliminados si correspondía.');
+        ->with('success', $mensaje);
 }
 
-    // Opcionales si existen en tus rutas:
-    public function aprobar(\App\Models\Evento $evento)
-    {
-        $this->authorize('approve', $evento);
-        $evento->estado = 'aprobado';
-        $evento->save();
-        return redirect()->route('eventos.index')->with('success', 'Evento aprobado');
-    }
-    
-    public function cancelar(\App\Models\Evento $evento)
-    {
-        $this->authorize('cancel', $evento);
-        $evento->estado = 'pendiente';
-        $evento->save();
-        return redirect()->route('eventos.index')->with('success', 'Evento marcado como pendiente');
-    }
-    
-    private function syncTickets(Evento $evento, array $tickets): void
+// Opcionales si existen en tus rutas:
+public function aprobar(\App\Models\Evento $evento)
+{
+    $this->authorize('approve', $evento);
+    $evento->estado = 'aprobado';
+    $evento->save();
+    return redirect()->route('eventos.index')->with('success', 'Evento aprobado');
+}
+
+public function cancelar(\App\Models\Evento $evento)
+{
+    $this->authorize('cancel', $evento);
+    $evento->estado = 'pendiente';
+    $evento->save();
+    return redirect()->route('eventos.index')->with('success', 'Evento marcado como pendiente');
+}
+
+private function syncTickets(Evento $evento, array $tickets): void
 {
     $rows = collect($tickets ?? [])
         ->filter(fn($t) => empty($t['_destroy']))
