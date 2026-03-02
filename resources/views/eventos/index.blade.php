@@ -166,11 +166,10 @@
                                 <div class="hidden md:block h-10 border-l border-gray-200 mx-1"></div>
                                 <div class="flex flex-col gap-y-1 items-end">
                                     @if($rolEnEsteEvento === 'admin' || $rolEnEsteEvento === 'subadmin' || $user->hasRole('superadmin'))
-                                        <button type="button"
-                                                class="inline-flex items-center px-3 py-1 bg-purple-500 text-white rounded text-xs font-semibold opacity-90 cursor-not-allowed mb-1"
-                                                title="Pendiente de desarrollo">
-                                            Agregar invitados
-                                        </button>
+                                        <a href="{{ route('eventos.invitados', $evento->id) }}"
+                                            class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold">
+                                            Gestionar invitados
+                                        </a>
                                     @endif
 
                                     @if($rolEnEsteEvento === 'admin' || $user->hasRole('superadmin'))
@@ -253,11 +252,10 @@
                                 </form>
                             @endcan
                             @if($rolEnEsteEvento === 'admin' || $rolEnEsteEvento === 'subadmin' || $user->hasRole('superadmin'))
-                                <button type="button"
-                                        class="inline-flex items-center px-3 py-1 bg-purple-500 text-white rounded text-xs font-semibold opacity-90 cursor-not-allowed"
-                                        title="Pendiente de desarrollo">
-                                    Agregar invitados
-                                </button>
+                                <a href="{{ route('eventos.invitados', $evento->id) }}"
+                                    class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold">
+                                    Gestionar invitados
+                                </a>
                             @endif
 
                             @if($rolEnEsteEvento === 'admin' || $user->hasRole('superadmin'))
@@ -284,10 +282,10 @@
         </div>
     @endif
 
-    <script>
-        function toggleInfoCard(id) {
-            let el = document.getElementById('info-card-' + id);
-            if (el) el.classList.toggle('hidden');
-        }
-    </script>
+<script>
+function toggleInfoCard(id) {
+    let el = document.getElementById('info-card-' + id);
+    if (el) el.classList.toggle('hidden');
+}
+</script>
 @endsection

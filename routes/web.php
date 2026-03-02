@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventoController;
 use App\Http\Controllers\PersonaController;
+use App\Http\Controllers\EventoInvitadoController;
+
 
 Route::get('/', fn () => view('welcome'));
 
@@ -45,6 +47,8 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:approve,evento')->name('eventos.aprobar');
     Route::post('/eventos/{evento}/cancelar', [EventoController::class, 'cancelar'])
         ->middleware('can:cancel,evento')->name('eventos.cancelar');
+        Route::post('/eventos/{evento}/invitaciones/enviar-masivo', [EventoInvitadoController::class, 'enviarInvitacionesMasivo'])
+  ->name('eventos.invitaciones.enviarMasivo');
 
     // =============== NUEVA RUTA para cambiar administrador del evento ===============
     Route::post('/eventos/{evento}/cambiar-admin', [EventoController::class, 'cambiarAdmin'])
@@ -54,6 +58,22 @@ Route::middleware(['auth'])->group(function () {
 
     // NO CARGAR MAS RUTAS DE ADMINS:
     // require __DIR__.'/admins.php';
+    // Gestión de invitados - Solo accesible a admin/subadmin del evento
+    Route::post('/eventos/{evento}/invitados', [App\Http\Controllers\EventoController::class, 'invitarInvitado'])
+    ->middleware('can:manageGuests,evento')
+    ->name('eventos.invitar-invitado');
+
+    Route::post('/eventos/{evento}/invitaciones-pendientes', [App\Http\Controllers\EventoController::class, 'agregarInvitadoPendiente'])
+    ->middleware('can:manageGuests,evento')
+    ->name('eventos.invitaciones-pendientes');
+    Route::get('/eventos/{evento}/invitados', [\App\Http\Controllers\EventoInvitadoController::class, 'index'])
+    ->name('eventos.invitados')
+    ->middleware('can:manageGuests,evento');
+    Route::post('/eventos/{evento}/invitaciones-pendientes-masivo', [EventoInvitadoController::class, 'cargarInvitacionesMasivo']);
+    Route::get('/eventos/{evento}/invitados/gestion', [EventoInvitadoController::class, 'gestion'])
+    ->name('eventos.invitados.gestion');
+    
+    
 });
 require __DIR__.'/eventos_equipo.php';
 require __DIR__.'/auth.php';

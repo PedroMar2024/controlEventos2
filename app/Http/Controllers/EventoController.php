@@ -557,4 +557,34 @@ public function cambiarAdmin(Request $request, Evento $evento)
 
     return redirect()->route('eventos.show', $evento)->with('success', 'Administrador de evento cambiado correctamente.');
 }
+
+
+public function agregarInvitadoPendiente(Request $request, Evento $evento)
+{
+    $request->validate([
+        'email' => 'required|email'
+    ]);
+
+    // Evita duplicados (mismo evento y email)
+    $existe = InvitacionEvento::where('evento_id', $evento->id)
+                ->where('email', $request->email)
+                ->exists();
+
+    if ($existe) {
+        return response()->json([
+            'success' => false,
+            'mensaje' => 'Ese correo ya está en la bandeja de invitaciones para este evento.'
+        ]);
+    }
+
+    InvitacionEvento::create([
+        'evento_id' => $evento->id,
+        'email' => $request->email,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'mensaje' => 'Invitado agregado a la bandeja. Cuando decidas, podrás enviarle la notificación.'
+    ]);
+}
 }
