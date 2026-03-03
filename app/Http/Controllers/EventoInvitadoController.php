@@ -8,17 +8,39 @@ use App\Models\InvitacionEvento;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 
-
 class EventoInvitadoController extends Controller
 {
-    public function index(Evento $evento)
+    // Vista PRINCIPAL de gestión de invitados
+    public function gestion(Evento $evento)
     {
-        // Traemos todos los invitados de este evento
+        //$evento = Evento::findOrFail($eventoId);
         $invitados = InvitacionEvento::where('evento_id', $evento->id)->get();
 
-        return view('eventos.invitados.index', compact('evento', 'invitados'));
+        return view('eventos.invitados.gestion', compact('evento', 'invitados'));
     }
 
+    // Form para agregar invitado MANUAL/MASIVO
+    public function agregarInvitado(Request $request, Evento $evento) // <--- modelo Evento
+    {
+        $request->validate([
+            'email' => 'required|email'
+        ]);
+        //$evento = Evento::findOrFail($eventoId);
+
+        if (InvitacionEvento::where('evento_id', $evento->id)->where('email', $request->email)->exists()) {
+            return back()->with('status', 'Ese email ya está invitado.');
+        }
+
+        InvitacionEvento::create([
+            'evento_id' => $evento->id,
+            'email' => $request->email,
+            'enviada' => false,
+            'datos_completados' => false
+        ]);
+        return back()->with('status', 'Invitado cargado correctamente.');
+    }
+
+    // AGREGADO MASIVO (carga desde array, por ejemplo Excel)
     public function cargarInvitacionesMasivo(Request $request, $eventoId)
     {
         $emails = $request->input('emails', []);
@@ -60,25 +82,143 @@ class EventoInvitadoController extends Controller
         }
     }
 
-    public function gestion($eventoId)
+    // Envío MASIVO de todas las invitaciones pendientes
+    public function enviarInvitacionesMasivo($eventoId)
     {
-        // Buscá el evento por ID
         $evento = Evento::findOrFail($eventoId);
 
-        // Buscá los invitados de ese evento
-        $invitados = InvitacionEvento::where('evento_id', $evento->id)->get();
+        $pendientes = InvitacionEvento::where('evento_id', $evento->id)
+            ->where(function($q) {
+                $q->whereNull('enviada')->orWhere('enviada', false);
+            })
+            ->get();
 
-        // Retorná la vista nueva, pasando los datos necesarios
-        return view('eventos.invitados.gestion', compact('evento', 'invitados'));
+        $enviadas_ok = [];
+        $enviadas_error = [];
+
+        foreach ($pendientes as $inv) {
+            try {
+                if (empty($inv->token)) {
+                    $inv->token = Str::random(32);
+                }
+                $inv->enviada = true;
+                $inv->fecha_envio = now();
+                $inv->save();
+
+                $link = url('/invitacion/confirmar?token=' . $inv->token);
+
+                Mail::raw("Te invitaron al evento '{$evento->nombre}'. Confirmá asistencia acá: $link", function ($message) use ($inv) {
+                    $message->to($inv->email)
+                            ->subject('Confirmá tu invitación al evento');
+                });
+
+                $enviadas_ok[] = $inv->email;
+            } catch (\Throwable $ex) {
+                $enviadas_error[] = $inv->email;
+            }
+        }
+
+        return redirect()->back()->with('status', 
+            "Se enviaron " . count($enviadas_ok) . " invitaciones." . 
+            (count($enviadas_error) ? " Fallaron: " . implode(", ", $enviadas_error) : "")
+        );
     }
-    
+    public function enviarInvitacionIndividual(Evento $evento, InvitacionEvento $invitacion)
+{
+    // Chequeo: ¿el invitado pertenece a este evento?
+    if ($invitacion->evento_id !== $evento->id) {
+        return back()->with('status', 'La invitación no corresponde a este evento.');
+    }
 
-public function enviarInvitacionesMasivo($eventoId)
+    // Si ya está enviada, no hacemos nada
+    if ($invitacion->enviada) {
+        return back()->with('status', 'La invitación ya fue enviada.');
+    }
+
+    try {
+        // Generar token si no tiene
+        if (empty($invitacion->token)) {
+            $invitacion->token = \Illuminate\Support\Str::random(32);
+        }
+        // Marcar como enviada y fecha
+        $invitacion->enviada = true;
+        $invitacion->fecha_envio = now();
+        $invitacion->save();
+
+        // Armá el link único de confirmación
+        $link = url('/invitacion/confirmar?token=' . $invitacion->token);
+
+        // Enviar el mail
+        \Mail::raw(
+            "Te invitaron al evento '{$evento->nombre}'. Confirmá asistencia acá: $link",
+            function ($message) use ($invitacion) {
+                $message->to($invitacion->email)
+                        ->subject('Confirmá tu invitación al evento');
+            }
+        );
+
+        return back()->with('status', 'Invitación enviada correctamente.');
+    } catch (\Throwable $ex) {
+        return back()->with('status', 'Ocurrió un error al enviar la invitación.');
+    }
+}
+public function importarDesdeExcel(Request $request, Evento $evento)
+{
+    // Validar que se haya subido archivo
+    $request->validate([
+        'archivo_invitados' => 'required|file|mimes:xls,xlsx'
+    ]);
+
+    try {
+        // Cargar todas las filas del archivo
+        $path = $request->file('archivo_invitados')->getRealPath();
+
+        $rows = Excel::toArray([], $path)[0]; // Toma la primer hoja del archivo
+
+        $emails_nuevos = 0;
+        $emails_existentes = 0;
+
+        foreach ($rows as $index => $fila) {
+            // Saltear encabezado si lo hubiera (usualmente primera fila)
+            if ($index === 0 && str_contains(strtolower($fila[0]), 'mail')) {
+                continue;
+            }
+
+            $email = trim($fila[0] ?? '');
+
+            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                // Chequea si ya existe la invitacion
+                $ya_existe = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
+                    ->where('email', $email)
+                    ->exists();
+
+                if (!$ya_existe) {
+                    \App\Models\InvitacionEvento::create([
+                        'evento_id' => $evento->id,
+                        'email' => $email,
+                        'enviada' => false,
+                        'datos_completados' => false
+                    ]);
+                    $emails_nuevos++;
+                } else {
+                    $emails_existentes++;
+                }
+            }
+        }
+
+        return back()->with('status', "Carga finalizada: $emails_nuevos nuevos, $emails_existentes ya existían.");
+    } catch (\Throwable $ex) {
+        Log::error('Error en importación XLS: '.$ex->getMessage());
+        return back()->with('status', 'Ocurrió un error al procesar el archivo.');
+    }
+}
+public function enviarInvitacionesFinales($eventoId)
 {
     $evento = \App\Models\Evento::findOrFail($eventoId);
 
-    // Trae todas las invitaciones NO enviadas para ese evento
-    $pendientes = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
+    // Buscar invitados confirmados y que NO hayan recibido la invitación final
+    $invitados = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
+        ->where('confirmado', 1)
         ->where(function($q) {
             $q->whereNull('enviada')->orWhere('enviada', false);
         })
@@ -87,36 +227,62 @@ public function enviarInvitacionesMasivo($eventoId)
     $enviadas_ok = [];
     $enviadas_error = [];
 
-    foreach ($pendientes as $inv) {
+    foreach ($invitados as $inv) {
         try {
-            // Si no tiene token, generá uno
-            if (empty($inv->token)) {
-                $inv->token = Str::random(32);
-            }
-            // Marcá como enviada y poné fecha
+            // Podés generar un contenido más completo o poner el QR cuando esté
+            \Mail::raw(
+                "¡Hola! Recibiste tu invitación final al evento '{$evento->nombre}'.",
+                function ($message) use ($inv) {
+                    $message->to($inv->email)
+                            ->subject('Invitación Final al Evento');
+                }
+            );
+            // Marcá como enviada
             $inv->enviada = true;
             $inv->fecha_envio = now();
             $inv->save();
-
-            // Armá el link único de confirmación
-            $link = url('/invitacion/confirmar?token=' . $inv->token);
-
-            // Mandá el mail (básico, después lo podés personalizar)
-            Mail::raw("Te invitaron al evento '{$evento->nombre}'. Confirmá asistencia acá: $link", function ($message) use ($inv) {
-                $message->to($inv->email)
-                        ->subject('Confirmá tu invitación al evento');
-            });
-
             $enviadas_ok[] = $inv->email;
         } catch (\Throwable $ex) {
             $enviadas_error[] = $inv->email;
         }
     }
 
-    // Respuesta: volvé a la gestión con mensaje
-    return redirect()->back()->with('status', 
-        "Se enviaron " . count($enviadas_ok) . " invitaciones." . 
-        (count($enviadas_error) ? " Fallaron: " . implode(", ", $enviadas_error) : "")
+    // Volvé con mensaje al usuario
+    return redirect()->back()->with('status',
+        'Invitaciones finales enviadas: ' . count($enviadas_ok) .
+        ($enviadas_error ? '. Errores: ' . implode(', ', $enviadas_error) : '')
     );
+}
+public function eliminarInvitado($eventoId, $invitadoId)
+{
+    $evento = \App\Models\Evento::findOrFail($eventoId);
+    $invitacion = \App\Models\InvitacionEvento::findOrFail($invitadoId);
+
+    // Busca la persona por email
+    $persona = \App\Models\Persona::where('email', $invitacion->email)->first();
+    $userEliminado = false;
+
+    // Borra la relación del evento y la invitación
+    if ($persona) {
+        $evento->personas()->detach($persona->id);
+    }
+    $invitacion->delete();
+
+    // Chequea si la persona queda huérfana de eventos
+    if ($persona && $persona->eventos()->count() === 0) {
+        // Borra el usuario si existe
+        if ($persona->user) {
+            $persona->user->delete();
+            $userEliminado = true;
+        }
+        $persona->delete();
+    }
+
+    $msg = "Invitado eliminado correctamente.";
+    if ($userEliminado) {
+        $msg .= " Se eliminó el usuario relacionado, porque ya no tenía otros eventos.";
+    }
+
+    return redirect()->back()->with('status', $msg);
 }
 }

@@ -166,7 +166,7 @@
                                 <div class="hidden md:block h-10 border-l border-gray-200 mx-1"></div>
                                 <div class="flex flex-col gap-y-1 items-end">
                                     @if($rolEnEsteEvento === 'admin' || $rolEnEsteEvento === 'subadmin' || $user->hasRole('superadmin'))
-                                        <a href="{{ route('eventos.invitados', $evento->id) }}"
+                                        <a href="{{ route('eventos.invitados.gestion', $evento->id) }}"
                                             class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold">
                                             Gestionar invitados
                                         </a>
@@ -252,7 +252,7 @@
                                 </form>
                             @endcan
                             @if($rolEnEsteEvento === 'admin' || $rolEnEsteEvento === 'subadmin' || $user->hasRole('superadmin'))
-                                <a href="{{ route('eventos.invitados', $evento->id) }}"
+                                <a href="{{ route('eventos.invitados.gestion', $evento->id) }}"
                                     class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold">
                                     Gestionar invitados
                                 </a>

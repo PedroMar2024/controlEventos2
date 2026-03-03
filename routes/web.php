@@ -5,7 +5,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventoController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\EventoInvitadoController;
-
+use Maatwebsite\Excel\Facades\Excel; // arriba de tu controlador
+use Illuminate\Support\Facades\Log;
 
 Route::get('/', fn () => view('welcome'));
 
@@ -47,34 +48,50 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:approve,evento')->name('eventos.aprobar');
     Route::post('/eventos/{evento}/cancelar', [EventoController::class, 'cancelar'])
         ->middleware('can:cancel,evento')->name('eventos.cancelar');
-        Route::post('/eventos/{evento}/invitaciones/enviar-masivo', [EventoInvitadoController::class, 'enviarInvitacionesMasivo'])
-  ->name('eventos.invitaciones.enviarMasivo');
 
-    // =============== NUEVA RUTA para cambiar administrador del evento ===============
+    // Cambio de admin del evento
     Route::post('/eventos/{evento}/cambiar-admin', [EventoController::class, 'cambiarAdmin'])
-        ->middleware('can:update,evento') // O poné 'role:superadmin' si querés solo superadmin
+        ->middleware('can:update,evento')
         ->name('eventos.cambiar-admin');
-    // ================================================================================
 
-    // NO CARGAR MAS RUTAS DE ADMINS:
-    // require __DIR__.'/admins.php';
-    // Gestión de invitados - Solo accesible a admin/subadmin del evento
-    Route::post('/eventos/{evento}/invitados', [App\Http\Controllers\EventoController::class, 'invitarInvitado'])
-    ->middleware('can:manageGuests,evento')
-    ->name('eventos.invitar-invitado');
-
-    Route::post('/eventos/{evento}/invitaciones-pendientes', [App\Http\Controllers\EventoController::class, 'agregarInvitadoPendiente'])
-    ->middleware('can:manageGuests,evento')
-    ->name('eventos.invitaciones-pendientes');
-    Route::get('/eventos/{evento}/invitados', [\App\Http\Controllers\EventoInvitadoController::class, 'index'])
-    ->name('eventos.invitados')
-    ->middleware('can:manageGuests,evento');
-    Route::post('/eventos/{evento}/invitaciones-pendientes-masivo', [EventoInvitadoController::class, 'cargarInvitacionesMasivo']);
+    // ========== GESTIÓN DE INVITADOS EN UNA SOLA VISTA ==========
     Route::get('/eventos/{evento}/invitados/gestion', [EventoInvitadoController::class, 'gestion'])
-    ->name('eventos.invitados.gestion');
-    
-    
+        ->name('eventos.invitados.gestion')
+        ->middleware('can:manageGuests,evento');
+
+    Route::post('/eventos/{evento}/invitados/agregar', [EventoInvitadoController::class, 'agregarInvitado'])
+        ->name('eventos.invitados.agregar')
+        ->middleware('can:manageGuests,evento');
+
+    // Enviar notificaciones pendientes MASIVO
+    Route::post('/eventos/{evento}/invitaciones/enviar-masivo', [EventoInvitadoController::class, 'enviarInvitacionesMasivo'])
+        ->name('eventos.invitaciones.enviarMasivo')
+        ->middleware('can:manageGuests,evento');
+
+    // MASIVO carga pendientes (deja este como estaba)
+    Route::post('/eventos/{evento}/invitaciones-pendientes-masivo', [EventoInvitadoController::class, 'cargarInvitacionesMasivo'])
+        ->name('eventos.invitaciones.cargarMasivo')
+        ->middleware('can:manageGuests,evento');
+
+    // IMPORTAR DESDE EXCEL (AHORA CON NAME UNICO: importarExcel)
+    Route::post('/eventos/{evento}/invitaciones/importar', [App\Http\Controllers\EventoInvitadoController::class, 'importarDesdeExcel'])
+        ->name('eventos.invitaciones.importarExcel')
+        ->middleware('can:manageGuests,evento');
+
+    Route::post('/eventos/{evento}/invitaciones/{invitacion}/enviar', [App\Http\Controllers\EventoInvitadoController::class, 'enviarInvitacionIndividual'])
+        ->name('eventos.invitaciones.enviar')
+        ->middleware('can:manageGuests,evento');
+
+    Route::get('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'verForm'])
+        ->name('invitacion.confirmar');
+    Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
+        ->name('invitacion.confirmar.procesar');
+    Route::post('/eventos/{evento}/invitaciones/enviar-finales', [App\Http\Controllers\EventoInvitadoController::class, 'enviarInvitacionesFinales'])
+        ->name('eventos.invitaciones.enviarFinales');
+    Route::delete('/eventos/{evento}/invitados/{invitado}', [App\Http\Controllers\EventoInvitadoController::class, 'eliminarInvitado'])
+        ->name('eventos.invitados.eliminar');
 });
+
 require __DIR__.'/eventos_equipo.php';
 require __DIR__.'/auth.php';
 // require __DIR__.'/admins.php'; // <--- Comentada o eliminada
