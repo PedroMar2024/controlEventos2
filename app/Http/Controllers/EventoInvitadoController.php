@@ -164,34 +164,36 @@ class EventoInvitadoController extends Controller
 }
 public function importarDesdeExcel(Request $request, Evento $evento)
 {
-    // Validar que se haya subido archivo
+    // 1. Validamos el archivo subido: debe ser xls o xlsx.
     $request->validate([
         'archivo_invitados' => 'required|file|mimes:xls,xlsx'
     ]);
 
     try {
-        // Cargar todas las filas del archivo
-        $path = $request->file('archivo_invitados')->getRealPath();
-
-        $rows = Excel::toArray([], $path)[0]; // Toma la primer hoja del archivo
+        // 2. Cargamos todas las filas de la primera hoja del Excel.
+        $file = $request->file('archivo_invitados');
+        $rows = \Excel::toArray([], $file)[0];
 
         $emails_nuevos = 0;
         $emails_existentes = 0;
 
+        // 3. Recorremos cada fila y procesamos email.
         foreach ($rows as $index => $fila) {
-            // Saltear encabezado si lo hubiera (usualmente primera fila)
-            if ($index === 0 && str_contains(strtolower($fila[0]), 'mail')) {
+            // Si es la primera fila y tiene el encabezado con "mail", la salteamos.
+            if ($index === 0 && isset($fila[0]) && str_contains(strtolower($fila[0]), 'mail')) {
                 continue;
             }
 
             $email = trim($fila[0] ?? '');
 
+            // Si el email tiene formato válido...
             if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                // Chequea si ya existe la invitacion
+                // ...chequeamos si ya existe para este evento.
                 $ya_existe = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
                     ->where('email', $email)
                     ->exists();
 
+                // Si no existe, lo guardamos como pendiente.
                 if (!$ya_existe) {
                     \App\Models\InvitacionEvento::create([
                         'evento_id' => $evento->id,
@@ -205,10 +207,10 @@ public function importarDesdeExcel(Request $request, Evento $evento)
                 }
             }
         }
-
+        // 4. Volvemos con mensaje de resultado al usuario.
         return back()->with('status', "Carga finalizada: $emails_nuevos nuevos, $emails_existentes ya existían.");
     } catch (\Throwable $ex) {
-        Log::error('Error en importación XLS: '.$ex->getMessage());
+        \Log::error('Error en importación XLS: ' . $ex->getMessage());
         return back()->with('status', 'Ocurrió un error al procesar el archivo.');
     }
 }
