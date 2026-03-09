@@ -222,23 +222,27 @@ public function enviarInvitacionesFinales($eventoId)
     $invitados = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
         ->where('confirmado', 1)
         ->where(function($q) {
-            $q->whereNull('enviada')->orWhere('enviada', false);
+            $q->whereNull('enviada')->orWhere('enviada', false)->orWhere('enviada', 0);
         })
         ->get();
 
     $enviadas_ok = [];
     $enviadas_error = [];
 
+    // Link real para el evento (ajusta el destino según tu sistema)
+    $linkEvento = route('eventos.show', ['evento' => $evento->id]);
+
     foreach ($invitados as $inv) {
         try {
-            // Podés generar un contenido más completo o poner el QR cuando esté
-            \Mail::raw(
-                "¡Hola! Recibiste tu invitación final al evento '{$evento->nombre}'.",
-                function ($message) use ($inv) {
-                    $message->to($inv->email)
-                            ->subject('Invitación Final al Evento');
-                }
-            );
+            // Mensaje en castellano, incluye el link al evento
+            $mensaje = "¡Hola! Recibiste tu invitación final al evento '{$evento->nombre}'.\n".
+                       "Para ver el evento y acceder, hacé click en este enlace:\n".$linkEvento."\n".
+                       "¡Te esperamos!";
+            \Mail::raw($mensaje, function ($message) use ($inv, $evento) {
+                $message->to($inv->email)
+                        ->subject('Invitación Final al Evento '.$evento->nombre);
+            });
+
             // Marcá como enviada
             $inv->enviada = true;
             $inv->fecha_envio = now();
