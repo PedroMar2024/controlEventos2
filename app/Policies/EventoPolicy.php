@@ -9,24 +9,26 @@ class EventoPolicy
 {
     // Superadmin pasa cualquier ability (incluida 'delete')
     public function before(User $user, string $ability)
-{
-    if ($user->hasRole('superadmin')) {
-        // Forzamos que nunca tire excepción, ni siquiera si algo falla en el middleware
-        \Log::info("FORZADO: superadmin puede todo", [
-            'user_id' => $user->id,
-            'ability' => $ability,
-            'referer' => request()->headers->get('referer'),
-            'uri' => request()->getRequestUri(),
-        ]);
-        return true;
+    {
+        if ($user->hasRole('superadmin')) {
+            // Forzamos acceso total para superadmin, logueamos para auditoría
+            \Log::info("FORZADO: superadmin puede todo", [
+                'user_id' => $user->id,
+                'ability' => $ability,
+                'referer' => request()->headers->get('referer'),
+                'uri' => request()->getRequestUri(),
+            ]);
+            return true;
+        }
     }
-}
 
+    // Extrae el persona_id asociado al usuario
     private function personaId(User $user): ?int
     {
         return optional($user->persona)->id;
     }
 
+    // Chequea si el usuario es admin del evento (usa el rol real de tu tabla)
     private function esAdminEvento(User $user, Evento $evento): bool
     {
         $pid = $this->personaId($user);
@@ -34,7 +36,7 @@ class EventoPolicy
 
         $result = $evento->personas()
             ->where('personas.id', $pid)
-            ->wherePivot('role', 'admin')
+            ->wherePivot('role', 'admin_evento') // <- AJUSTADO para tu sistema
             ->exists();
 
         \Log::info('POLICY EventoPolicy.esAdminEvento', [
@@ -46,6 +48,7 @@ class EventoPolicy
         return $result;
     }
 
+    // Chequea si el usuario es subadmin del evento (rol de tu tabla)
     private function esSubadminEvento(User $user, Evento $evento): bool
     {
         $pid = $this->personaId($user);
@@ -53,7 +56,7 @@ class EventoPolicy
 
         $result = $evento->personas()
             ->where('personas.id', $pid)
-            ->wherePivot('role', 'subadmin')
+            ->wherePivot('role', 'subadmin_evento') // <- AJUSTADO
             ->exists();
 
         \Log::info('POLICY EventoPolicy.esSubadminEvento', [
@@ -65,6 +68,7 @@ class EventoPolicy
         return $result;
     }
 
+    // Chequea si el usuario tiene rol global de admin_evento
     private function esAdminGlobal(User $user): bool
     {
         $result = $user->hasRole('admin_evento');
@@ -85,6 +89,7 @@ class EventoPolicy
         return $result;
     }
 
+    // Visualización: permitido si es admin o subadmin del evento
     public function viewAny(User $user): bool
     {
         \Log::info("POLICY EventoPolicy.viewAny: acceso permitido", ['user_id' => $user->id]);
@@ -102,6 +107,7 @@ class EventoPolicy
         return $allowed;
     }
 
+    // Crear evento: debe tener rol admin_evento global
     public function create(User $user): bool
     {
         $allowed = $this->esAdminGlobal($user);
@@ -112,7 +118,7 @@ class EventoPolicy
         return $allowed;
     }
 
-    // Admin del evento: solo edita mientras 'pendiente' (superadmin via before)
+    // Actualizar solo si es admin del evento y el evento está pendiente
     public function update(User $user, Evento $evento): bool
     {
         $allowed = $evento->estado === 'pendiente' && $this->esAdminEvento($user, $evento);
@@ -125,19 +131,18 @@ class EventoPolicy
         return $allowed;
     }
 
-    // Eliminar: solo superadmin (admins no pueden; igual superadmin pasa before)
+    // Eliminar: solo superadmin (pero admin del evento puede si está pendiente)
     public function delete(User $user, Evento $evento): bool
-{
-    // Admin del evento puede borrar mientras el evento esté pendiente
-    $allowed = $evento->estado === 'pendiente' && $this->esAdminEvento($user, $evento);
-    \Log::info("POLICY EventoPolicy.delete", [
-        'user_id' => $user->id,
-        'evento_id' => $evento->id,
-        'evento_estado' => $evento->estado,
-        'allowed' => $allowed,
-    ]);
-    return $allowed;
-}
+    {
+        $allowed = $evento->estado === 'pendiente' && $this->esAdminEvento($user, $evento);
+        \Log::info("POLICY EventoPolicy.delete", [
+            'user_id' => $user->id,
+            'evento_id' => $evento->id,
+            'evento_estado' => $evento->estado,
+            'allowed' => $allowed,
+        ]);
+        return $allowed;
+    }
 
     public function manageSubadmins(User $user, Evento $evento): bool
     {
@@ -150,10 +155,10 @@ class EventoPolicy
         return $allowed;
     }
 
+    // ---- AJUSTE PARA ACCESO REAL ----
     public function manageGuests(User $user, Evento $evento): bool
     {
-        $allowed = $this->esAdminGlobal($user)
-            || $this->esSubadminGlobal($user)
+        $allowed = $user->hasRole('superadmin')
             || $this->esAdminEvento($user, $evento)
             || $this->esSubadminEvento($user, $evento);
 
@@ -165,7 +170,6 @@ class EventoPolicy
         return $allowed;
     }
 
-    // Aprobación / volver a pendiente: solo superadmin (pasa por before)
     public function approve(User $user, Evento $evento): bool {
         \Log::info("POLICY EventoPolicy.approve", [
             'user_id' => $user->id,

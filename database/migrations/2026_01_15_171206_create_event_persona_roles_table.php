@@ -11,7 +11,8 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('evento_id')->constrained('eventos')->cascadeOnDelete();
             $table->foreignId('persona_id')->constrained('personas')->cascadeOnDelete();
-            $table->string('role'); // admin | subadmin | invitado
+            // --- USAR nombres estandarizados en código ---
+            $table->string('role'); // admin_evento | subadmin_evento | invitado
             $table->timestamps();
 
             $table->unique(['evento_id','persona_id','role'], 'event_persona_role_unique');

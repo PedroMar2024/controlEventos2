@@ -19,7 +19,7 @@ class ConfirmacionInvitacionController extends Controller
         if (!$invitacion) {
             return view('invitacion.no_encontrada');
         }
-        return view('invitacion.confirmar', [
+        return view('eventos.invitados.confirmar', [
             'invitacion' => $invitacion,
         ]);
     }
@@ -37,9 +37,8 @@ class ConfirmacionInvitacionController extends Controller
 
     $invitacion = \App\Models\InvitacionEvento::where('token', $data['token'])->first();
 
-    // Analogia: es como si el portero chequea la invitación en la lista.
+    // Analogia: el portero chequea la ficha en la lista
     if (!$invitacion) {
-        // Si la invitación fue borrada, no deja entrar.
         return view('eventos.invitados.invitacion_no_encontrada');
     }
 
@@ -50,23 +49,27 @@ class ConfirmacionInvitacionController extends Controller
 
     \DB::beginTransaction();
     try {
+        // Guardar SIEMPRE los datos en la invitación
+        $invitacion->nombre = $data['nombre'] ?? '';
+        $invitacion->apellido = $data['apellido'] ?? '';
+        $invitacion->dni = $data['dni'] ?? '';
+        $invitacion->datos_completados = true;
+        $invitacion->fecha_confirmacion = now();
+
         if ($data['accion'] === 'confirmar') {
             $invitacion->confirmado = 1;
-            $invitacion->fecha_confirmacion = now();
-            $invitacion->datos_completados = true;
 
-            // Buscar o crear persona (por email)
-            $persona = \App\Models\Persona::where('email', $invitacion->email)->first();
-            if (!$persona) {
-                $persona = \App\Models\Persona::create([
+            // Buscar o actualizar datos de la persona usando updateOrCreate
+            $persona = \App\Models\Persona::updateOrCreate(
+                ['email' => $invitacion->email],
+                [
                     'nombre'   => $data['nombre'] ?? '',
                     'apellido' => $data['apellido'] ?? '',
                     'dni'      => $data['dni'] ?? '',
-                    'email'    => $invitacion->email,
-                ]);
-            }
+                ]
+            );
 
-            // Asociar la persona al evento como invitado (evita duplicados)
+            // Asociar la persona al evento como invitado, evitando duplicados
             $evento = \App\Models\Evento::find($invitacion->evento_id);
             if ($evento && method_exists($evento, 'personas')) {
                 $evento->personas()->syncWithoutDetaching([$persona->id => ['role' => 'invitado']]);
@@ -74,14 +77,13 @@ class ConfirmacionInvitacionController extends Controller
         } else {
             // Si rechaza
             $invitacion->confirmado = 0;
-            $invitacion->fecha_confirmacion = now();
-            $invitacion->datos_completados = true;
+            // (opcional) Si también querés guardar cambios de nombre/dni, ya se guarda arriba
         }
+
         $invitacion->save();
 
         \DB::commit();
 
-        // Opcional: mostrar una vista final/simple
         return view('eventos.invitados.confirmacion_final', ['invitacion' => $invitacion]);
     } catch (\Throwable $ex) {
         \DB::rollBack();

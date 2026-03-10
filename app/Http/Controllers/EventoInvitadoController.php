@@ -20,22 +20,23 @@ class EventoInvitadoController extends Controller
     }
 
     // Form para agregar invitado MANUAL/MASIVO
-    public function agregarInvitado(Request $request, Evento $evento) // <--- modelo Evento
+    public function agregarInvitado(Request $request, Evento $evento)
     {
         $request->validate([
             'email' => 'required|email'
         ]);
-        //$evento = Evento::findOrFail($eventoId);
-
+    
         if (InvitacionEvento::where('evento_id', $evento->id)->where('email', $request->email)->exists()) {
             return back()->with('status', 'Ese email ya está invitado.');
         }
-
+    
+        $token = Str::random(32); // Genera token único
         InvitacionEvento::create([
             'evento_id' => $evento->id,
             'email' => $request->email,
             'enviada' => false,
-            'datos_completados' => false
+            'datos_completados' => false,
+            'token' => $token
         ]);
         return back()->with('status', 'Invitado cargado correctamente.');
     }
@@ -53,17 +54,19 @@ class EventoInvitadoController extends Controller
             $existe = InvitacionEvento::where('evento_id', $evento->id)
                 ->where('email', $email)
                 ->exists();
-
+        
             if ($existe) {
                 $ya_existian[] = $email;
                 continue;
             }
-
+        
+            $token = Str::random(32); // Token único para cada invitado
             InvitacionEvento::create([
                 'evento_id' => $evento->id,
                 'email' => $email,
                 'enviada' => false,
-                'datos_completados' => false
+                'datos_completados' => false,
+                'token' => $token
             ]);
             $ok[] = $email;
         }
@@ -195,11 +198,13 @@ public function importarDesdeExcel(Request $request, Evento $evento)
 
                 // Si no existe, lo guardamos como pendiente.
                 if (!$ya_existe) {
+                    $token = Str::random(32); // Generar token
                     \App\Models\InvitacionEvento::create([
                         'evento_id' => $evento->id,
                         'email' => $email,
                         'enviada' => false,
-                        'datos_completados' => false
+                        'datos_completados' => false,
+                        'token' => $token
                     ]);
                     $emails_nuevos++;
                 } else {
