@@ -129,7 +129,16 @@
           </div>
         </div>
       </div>
-
+      @if($evento->publico)
+    <div class="my-4 p-4 bg-green-100 border border-green-300 rounded-md">
+        <p class="font-semibold text-green-800 mb-2">Copiar Link del evento:</p>
+        <a href="{{ route('eventos.publico.comprar', ['evento' => $evento->id]) }}"
+           class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700"
+           target="_blank" rel="noopener">
+            {{ url()->to(route('eventos.publico.comprar', ['evento' => $evento->id], false)) }}
+        </a>
+    </div>
+@endif
       <!-- Pie con ID -->
       <div class="px-6 py-4 border-t bg:white/70">
         <div class="flex items-center justify-between">

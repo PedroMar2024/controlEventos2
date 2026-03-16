@@ -86,6 +86,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
         ->name('invitacion.confirmar.procesar');
 });
+Route::get('/eventos/{evento}/comprar', [EventoCompraController::class, 'showForm'])
+    ->name('eventos.publico.comprar');
+
+Route::post('/eventos/{evento}/comprar', [EventoCompraController::class, 'procesarCompra'])
+    ->name('eventos.publico.comprar.procesar');
+    // Procesar solicitud de compra de entradas para eventos públicos (POST)
 
 // ---- Otros módulos ----
 require __DIR__.'/eventos_equipo.php';
