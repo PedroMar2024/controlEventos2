@@ -1,53 +1,53 @@
 @php
-    use Carbon\Carbon;
+use Carbon\Carbon;
 
-    $user = auth()->user();
-    $personaId = optional($user->persona)->id;
+$user = auth()->user();
+$personaId = optional($user->persona)->id;
 
-    // Traer eventos donde soy admin o subadmin
-    $eventosAdmin = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
-        $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'admin');
-    })->get();
+// Traer eventos donde soy admin_evento o subadmin_evento
+$eventosAdmin = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
+    $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'admin_evento');
+})->get();
 
-    $eventosSubadmin = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
-        $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'subadmin');
-    })->get();
+$eventosSubadmin = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
+    $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'subadmin_evento');
+})->get();
 
-    // Combinar, calcular días faltantes y filtrar solo los futuros o hoy
-    $eventosAdministrador = $eventosAdmin->map(function($ev) {
-        $ev->mi_rol = 'Admin';
-        return $ev;
-    })->merge(
-        $eventosSubadmin->map(function($ev) {
-            $ev->mi_rol = 'Subadmin';
-            return $ev;
-        })
-    )->map(function($ev) {
-        // Solo diferencia en días, enteros, negativo si ya pasó
-        $ev->dias_faltan = Carbon::now()->startOfDay()->diffInDays(Carbon::parse($ev->fecha_evento)->startOfDay(), false);
+// Combinar, calcular días faltantes y filtrar solo los futuros o hoy
+$eventosAdministrador = $eventosAdmin->map(function($ev) {
+    $ev->mi_rol = 'Admin evento';
+    return $ev;
+})->merge(
+    $eventosSubadmin->map(function($ev) {
+        $ev->mi_rol = 'Subadmin evento';
         return $ev;
     })
-    // Solo los que faltan días o son hoy
-    ->filter(function($ev){
-        return $ev->dias_faltan >= 0;
-    })
-    ->sortBy('dias_faltan')->values();
+)->map(function($ev) {
+    // Solo diferencia en días, enteros, negativo si ya pasó
+    $ev->dias_faltan = Carbon::now()->startOfDay()->diffInDays(Carbon::parse($ev->fecha_evento)->startOfDay(), false);
+    return $ev;
+})
+// Solo los que faltan días o son hoy
+->filter(function($ev){
+    return $ev->dias_faltan >= 0;
+})
+->sortBy('dias_faltan')->values();
 
-    $totalEventosAdministrador = $eventosAdministrador->count();
+$totalEventosAdministrador = $eventosAdministrador->count();
 
-    // Invitaciones
-    $eventosInvitado = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
-        $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'invitado');
-    })->orderBy('fecha_evento','asc')->get();
+// Invitaciones
+$eventosInvitado = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
+    $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'invitado');
+})->orderBy('fecha_evento','asc')->get();
 
-    $totalInvitaciones = $eventosInvitado->count();
+$totalInvitaciones = $eventosInvitado->count();
 
-    $fmtFecha = fn($ev) => optional($ev->fecha_evento)->format('d/m/Y') ?: '—';
+$fmtFecha = fn($ev) => optional($ev->fecha_evento)->format('d/m/Y') ?: '—';
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 
-    <!-- Card "MIS EVENTOS" (Admin / Subadmin) -->
+    <!-- Card "MIS EVENTOS" (Admin_evento / Subadmin_evento) -->
     <div class="bg-white rounded-xl shadow-md p-4 flex flex-col">
         <div class="flex justify-between items-center mb-2">
             <span class="text-2xl text-emerald-700 font-extrabold">Mis eventos</span>
@@ -58,7 +58,7 @@
                 <li class="flex items-center justify-between bg-emerald-50 rounded px-2 py-1">
                     <div class="flex flex-col items-start">
                         <span class="text-sm font-medium text-gray-900">{{ $ev->nombre }}</span>
-                        <span class="text-xs {{ $ev->mi_rol === 'Admin' ? 'text-emerald-700' : 'text-indigo-700' }} font-semibold">{{ $ev->mi_rol }}</span>
+                        <span class="text-xs {{ $ev->mi_rol === 'Admin evento' ? 'text-emerald-700' : 'text-indigo-700' }} font-semibold">{{ $ev->mi_rol }}</span>
                     </div>
                     <div class="flex flex-col items-end">
                         <span class="text-lg font-mono text-gray-700">
@@ -74,7 +74,7 @@
                     </div>
                 </li>
             @empty
-                <li class="py-2 text-xs text-gray-400 text-center">No estás como admin ni subadmin en ningún evento próximo.</li>
+                <li class="py-2 text-xs text-gray-400 text-center">No estás como admin_evento ni subadmin_evento en ningún evento próximo.</li>
             @endforelse
         </ul>
         <a href="{{ route('eventos.index') }}"

@@ -58,8 +58,8 @@
                         if (!$user || !$evento->relationLoaded('personas')) return '-';
                         $personaId = $user->persona_id ?? null;
                         $pivot = $evento->personas->firstWhere('id', $personaId)?->pivot?->role ?? null;
-                        if ($pivot === 'admin') return 'Admin';
-                        if ($pivot === 'subadmin') return 'Subadmin';
+                        if ($pivot === 'admin_evento') return 'Admin evento';
+                        if ($pivot === 'subadmin_evento') return 'Subadmin evento';
                         if ($pivot === 'invitado') return 'Invitado';
                         return $pivot ? ucfirst($pivot) : '-';
                     }
@@ -125,7 +125,7 @@
 
                                             $esAdminEvento = false;
                                             if ($esAdmin && $evento->relationLoaded('personas')) {
-                                                $esAdminEvento = $evento->personas->where('pivot.role', 'admin')
+                                                $esAdminEvento = $evento->personas->where('pivot.role', 'admin_evento')
                                                     ->where('id', $user->persona_id ?? -1)->isNotEmpty();
                                             }
                                             $puedeEliminar = $esSuperadmin || ($esAdminEvento && $estadoPendiente);
@@ -165,14 +165,14 @@
                                 </div>
                                 <div class="hidden md:block h-10 border-l border-gray-200 mx-1"></div>
                                 <div class="flex flex-col gap-y-1 items-end">
-                                    @if($rolEnEsteEvento === 'admin' || $rolEnEsteEvento === 'subadmin' || $user->hasRole('superadmin'))
+                                    @if($rolEnEsteEvento === 'admin_evento' || $rolEnEsteEvento === 'subadmin_evento' || $user->hasRole('superadmin'))
                                         <a href="{{ route('eventos.invitados.gestion', $evento->id) }}"
                                             class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold">
                                             Gestionar invitados
                                         </a>
                                     @endif
 
-                                    @if($rolEnEsteEvento === 'admin' || $user->hasRole('superadmin'))
+                                    @if($rolEnEsteEvento === 'admin_evento' || $user->hasRole('superadmin'))
                                         <a href="{{ route('eventos.equipo.index', $evento->id) }}"
                                             class="inline-flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-800 text-white rounded text-xs font-semibold">
                                             Gestionar equipo
@@ -251,14 +251,14 @@
                                     </button>
                                 </form>
                             @endcan
-                            @if($rolEnEsteEvento === 'admin' || $rolEnEsteEvento === 'subadmin' || $user->hasRole('superadmin'))
+                            @if($rolEnEsteEvento === 'admin_evento' || $rolEnEsteEvento === 'subadmin_evento' || $user->hasRole('superadmin'))
                                 <a href="{{ route('eventos.invitados.gestion', $evento->id) }}"
                                     class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold">
                                     Gestionar invitados
                                 </a>
                             @endif
 
-                            @if($rolEnEsteEvento === 'admin' || $user->hasRole('superadmin'))
+                            @if($rolEnEsteEvento === 'admin_evento' || $user->hasRole('superadmin'))
                                 <a href="{{ route('eventos.equipo.index', $evento->id) }}"
                                     class="inline-flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-800 text-white rounded text-xs font-semibold">
                                     Gestionar equipo

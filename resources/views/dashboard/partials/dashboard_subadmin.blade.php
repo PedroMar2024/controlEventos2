@@ -4,14 +4,14 @@
     $user = auth()->user();
     $personaId = optional($user->persona)->id;
 
-    // Solo eventos donde soy subadmin
+    // Solo eventos donde sos subadmin_evento
     $eventosSubadmin = \App\Models\Evento::whereHas('personas', function ($q) use ($personaId) {
-        $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'subadmin');
+        $q->where('personas.id', $personaId)->where('event_persona_roles.role', 'subadmin_evento');
     })->get();
 
     // Armar objeto igual que el dashboard admin
     $eventosSubadminCard = $eventosSubadmin->map(function($ev) {
-        $ev->mi_rol = 'Subadmin';
+        $ev->mi_rol = 'Subadmin evento';
         $ev->dias_faltan = Carbon::now()->startOfDay()->diffInDays(Carbon::parse($ev->fecha_evento)->startOfDay(), false);
         return $ev;
     })
@@ -33,7 +33,7 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 
-    <!-- Card "MIS EVENTOS" (Subadmin) -->
+    <!-- Card "MIS EVENTOS" (Subadmin_evento) -->
     <div class="bg-white rounded-xl shadow-md p-4 flex flex-col">
         <div class="flex justify-between items-center mb-2">
             <span class="text-2xl text-emerald-700 font-extrabold">Mis eventos</span>
@@ -58,7 +58,7 @@
                     </div>
                 </li>
             @empty
-                <li class="py-2 text-xs text-gray-400 text-center">No estás como subadmin en ningún evento próximo.</li>
+                <li class="py-2 text-xs text-gray-400 text-center">No estás como subadmin_evento en ningún evento próximo.</li>
             @endforelse
         </ul>
         <a href="{{ route('eventos.index') }}"

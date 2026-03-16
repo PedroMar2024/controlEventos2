@@ -108,13 +108,13 @@
 
     {{-- Acciones masivas/Finales --}}
     <div class="flex flex-col md:flex-row gap-4 mt-8 justify-end">
-        <form method="POST" action="{{ route('eventos.invitaciones.enviarMasivo', ['evento' => $evento->id]) }}">
-            @csrf
-            <button type="submit"
-                class="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded font-semibold text-base">
-                Enviar notificaciones pendientes
-            </button>
-        </form>
+    <form method="POST" action="{{ url('/eventos/' . $evento->id . '/invitaciones/enviar-masivo') }}">
+    @csrf
+    <button type="submit" class="px-5 py-2 bg-green-700 hover:bg-green-800 text-white rounded font-semibold text-base">
+        
+        Enviar notificaciones pendientes
+    </button>
+    </form>
         <form method="POST" action="{{ route('eventos.invitaciones.enviarFinales', $evento->id) }}">
             @csrf
             <button type="submit"

@@ -86,9 +86,9 @@ class EventoInvitadoController extends Controller
     }
 
     // Envío MASIVO de todas las invitaciones pendientes
-    public function enviarInvitacionesMasivo($eventoId)
+    public function enviarInvitacionesMasivo(Request $request, Evento $evento)
     {
-        $evento = Evento::findOrFail($eventoId);
+        //$evento = Evento::findOrFail($eventoId);
 
         $pendientes = InvitacionEvento::where('evento_id', $evento->id)
             ->where(function($q) {

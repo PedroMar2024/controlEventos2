@@ -22,88 +22,81 @@ class EquipoEventoController extends Controller
     public function index(Evento $evento)
     {
         $admin = $evento->adminPersona; // admin_persona_id
-        $subadmins = $evento->personas()->wherePivot('role', 'subadmin')->get();
+        $subadmins = $evento->personas()->wherePivot('role', 'subadmin_evento')->get();
         $count = $subadmins->count();
 
         return view('eventos.equipo', compact('evento', 'admin', 'subadmins', 'count'));
     }
 
-    // Agregar subadmin por email (envía reset SOLO si el usuario es nuevo)
     public function store(Request $request, Evento $evento)
 {
     $data = $request->validate([
         'nombre'   => ['required', 'string', 'max:255'],
         'apellido' => ['required', 'string', 'max:255'],
-        'dni'      => ['required', 'string', 'max:255', 'unique:personas,dni'],
-        'email'    => [
-            'required',
-            'email',
-            'max:255',
-            'unique:users,email',
-            'unique:personas,email'
-        ],
+        'dni'      => ['required', 'string', 'max:255'],
+        'email'    => ['required', 'email', 'max:255'],
     ]);
 
-    // Límite 10 subadmins
-    $current = $evento->personas()->wherePivot('role', 'subadmin')->count();
-    if ($current >= 10) {
-        return back()->with('error', 'Máximo 10 subadmins por evento.')->withInput();
+    // Buscar persona existente por email o dni
+    $persona = \App\Models\Persona::where('email', $data['email'])
+        ->orWhere('dni', $data['dni'])
+        ->first();
+
+    if (!$persona) {
+        // Si no existe, crear la persona
+        $persona = \App\Models\Persona::create([
+            'nombre'   => $data['nombre'],
+            'apellido' => $data['apellido'],
+            'dni'      => $data['dni'],
+            'email'    => $data['email'],
+        ]);
     }
 
-    // Crear Persona (controla duplicidad por unique en email/dni)
-    $persona = \App\Models\Persona::create([
-        'nombre'   => $data['nombre'],
-        'apellido' => $data['apellido'],
-        'dni'      => $data['dni'],
-        'email'    => $data['email'],
-    ]);
-
-    // Evitar duplicado como subadmin en el evento (por si acaso)
+    // Evitar duplicado como subadmin en el evento actual
     $exists = $evento->personas()
         ->where('personas.id', $persona->id)
-        ->wherePivot('role', 'subadmin')
+        ->wherePivot('role', 'subadmin_evento')
         ->exists();
+
     if ($exists) {
-        return back()->with('error', 'Esta persona ya es subadmin del evento.')->withInput();
+        return back()->with('error', 'Esta persona ya es subadmin de este evento.')->withInput();
     }
 
-    // Bloqueos:
-    // 1) el actor no puede agregarse a sí mismo
+    // Bloqueos adicionales (mantener si ya los tenés)
     $actorPersonaId = optional(auth()->user()->persona)->id;
     if ($actorPersonaId && $persona->id === $actorPersonaId) {
         return back()->with('error', 'No podés agregarte a vos mismo como subadmin de este evento.')->withInput();
     }
 
-    // 2) el admin del evento no puede ser subadmin
     if ((int)$evento->admin_persona_id === (int)$persona->id) {
         return back()->with('error', 'El admin del evento no puede ser agregado como subadmin.')->withInput();
     }
 
-    // 3) si ya es admin en el pivot, no permitir subadmin
+    // Si ya es admin en el evento, no permitir subadmin
     $esAdminPivot = $evento->personas()
         ->where('personas.id', $persona->id)
-        ->wherePivot('role', 'admin')
+        ->wherePivot('role', 'admin_evento')
         ->exists();
     if ($esAdminPivot) {
         return back()->with('error', 'Esta persona ya es admin del evento.')->withInput();
     }
 
-    DB::transaction(function () use ($evento, $persona, $data) {
-        // Adjuntar como subadmin en pivot
-        $evento->personas()->attach($persona->id, ['role' => 'subadmin']);
+    \DB::transaction(function () use ($evento, $persona) {
+        // Asociar como subadmin_evento al evento
+        $evento->personas()->attach($persona->id, ['role' => 'subadmin_evento']);
 
-        // Crear User y vincularlo
-        $user = \App\Models\User::create([
-            'name'       => $data['nombre'] . ' ' . $data['apellido'],
-            'email'      => $data['email'],
-            'password'   => bcrypt(Str::random(32)),
-            'persona_id' => $persona->id,
-        ]);
-        // Asignar rol global
-        $user->assignRole('subadmin_evento');
-
-        \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
-        \Illuminate\Support\Facades\Log::info('EquipoEvento: Subadmin creado y reset enviado', ['email' => $user->email]);
+        // Si la persona no tiene usuario, lo creás (opcional)
+        if (!$persona->user) {
+            $user = \App\Models\User::create([
+                'name'       => $persona->nombre . ' ' . $persona->apellido,
+                'email'      => $persona->email,
+                'password'   => bcrypt(\Illuminate\Support\Str::random(32)),
+                'persona_id' => $persona->id,
+            ]);
+            $user->assignRole('subadmin_evento');
+            \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
+            \Illuminate\Support\Facades\Log::info('EquipoEvento: Subadmin creado y reset enviado', ['email' => $user->email]);
+        }
     });
 
     return back()->with('status', 'Subadmin agregado.');
