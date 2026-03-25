@@ -26,8 +26,8 @@ class Evento extends Model
     ];
 
     protected $casts = [
-        'fecha_evento'        => 'date',
-        // TIME se maneja como string; evita 'datetime:H:i' porque eso espera DATETIME
+        'fecha_evento' => 'date',
+        // TIME se maneja como string
         'hora_inicio'  => 'string',
         'hora_cierre'  => 'string',
         'capacidad'    => 'integer',
@@ -36,15 +36,25 @@ class Evento extends Model
         'reingreso'    => 'boolean',
     ];
 
+    // Admin del evento
     public function adminPersona()
     {
         return $this->belongsTo(\App\Models\Persona::class, 'admin_persona_id');
     }
-// NUEVO: relación con tipos de entrada
-public function tickets()
-{
-    return $this->hasMany(\App\Models\EventoTicket::class, 'evento_id');
-}
+
+    // TIPOS de entrada configurables para el evento (ej: General, VIP, etc.)
+    public function tiposEntrada()
+    {
+        return $this->hasMany(\App\Models\EventoTicket::class, 'evento_id');
+    }
+
+    // TICKETS físicos emitidos (boletos/QRs vinculados a personas)
+    public function tickets()
+    {
+        return $this->hasMany(\App\Models\Ticket::class, 'evento_id');
+    }
+
+    // Personas vinculadas al evento (con roles)
     public function personas()
     {
         return $this->belongsToMany(

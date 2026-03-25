@@ -39,5 +39,8 @@ class Persona extends Model
     {
         return $this->eventos()->wherePivot('role', 'invitado');
     }
-    
+    public function tickets()
+{
+    return $this->hasMany(Ticket::class, 'persona_id');
+}
 }
