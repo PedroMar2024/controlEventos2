@@ -7,6 +7,7 @@ use App\Models\Persona;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\EventoRolService;
 
 class EventoCompraController extends Controller
 {

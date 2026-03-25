@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventoController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\EventoInvitadoController;
+use App\Http\Controllers\EventoCompraController;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
 
@@ -85,6 +86,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('invitacion.confirmar');
     Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
         ->name('invitacion.confirmar.procesar');
+        Route::get('/admin/tickets/solicitudes', [TicketSolicitudController::class, 'index'])
+        ->name('admin.tickets.solicitudes');
 });
 Route::get('/eventos/{evento}/comprar', [EventoCompraController::class, 'showForm'])
     ->name('eventos.publico.comprar');
