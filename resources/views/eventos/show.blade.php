@@ -70,30 +70,29 @@
           </div>
 
           <!-- Tipos de entrada -->
-          <div class="mt-4">
-            <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Tipos de entrada</p>
-            @if($tickets->count() > 0)
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                @foreach($tickets as $t)
-                  <div class="rounded-lg border bg-white px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p class="text-sm font-semibold text-gray-900">{{ $t->nombre }}</p>
-                      <p class="text-xs text-gray-500">
-                        {{ $t->cupo ? ('Cupo: ' . $t->cupo) : 'Cupo: —' }}
-                        @if(!$t->activo)
-                          <span class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Inactivo</span>
-                        @endif
-                      </p>
+            <div class="mt-4">
+              <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Tipos de entrada</p>
+              @if($tiposEntrada->count() > 0)
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  @foreach($tiposEntrada as $tipo)
+                    <div class="rounded-lg border bg-white px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p class="text-sm font-semibold text-gray-900">{{ $tipo->nombre }}</p>
+                        <p class="text-xs text-gray-500">
+                          {{ $tipo->cupo ? ('Cupo: ' . $tipo->cupo) : 'Cupo: —' }}
+                          @if(!$tipo->activo)
+                            <span class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Inactivo</span>
+                          @endif
+                        </p>
+                      </div>
+                      <p class="text-sm font-bold text-emerald-700">${{ number_format((float)$tipo->precio, 2, ',', '.') }}</p>
                     </div>
-                    <p class="text-sm font-bold text-emerald-700">${{ number_format((float)$t->precio, 2, ',', '.') }}</p>
-                  </div>
-                @endforeach
-              </div>
-            @else
-              <p class="text-sm text-gray-600">Sin tipos de entrada configurados.</p>
-            @endif
-          </div>
-        </div>
+                  @endforeach
+                </div>
+              @else
+                <p class="text-sm text-gray-600">Sin tipos de entrada configurados.</p>
+              @endif
+            </div>
 
         <!-- Lateral tipo “talón” -->
         <div class="md:col-span-1">

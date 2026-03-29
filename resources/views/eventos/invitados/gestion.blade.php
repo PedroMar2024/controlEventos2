@@ -13,114 +13,180 @@
         </div>
     @endif
 
-    <div class="flex flex-col md:flex-row md:gap-8 mb-8">
-        {{-- Formulario de Agregar invitado --}}
-        <form method="POST" action="{{ route('eventos.invitados.agregar', $evento->id) }}" class="mb-4 md:mb-0 flex flex-col gap-2 w-full md:w-1/2 bg-gray-50 border rounded p-4">
+    {{-- ========= PASO 1 ========= --}}
+    <div class="mb-12 p-6 rounded-lg border bg-white shadow-sm">
+        <div class="flex items-center mb-4">
+            <span class="flex items-center justify-center bg-blue-600 text-white text-4xl font-extrabold rounded-full w-14 h-14 mr-6 shadow-lg border-4 border-blue-300 select-none">
+                1
+            </span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 uppercase tracking-tight">
+                Agendar invitados y pedir confirmación
+            </h2>
+        </div>
+        <p class="mb-6 text-gray-500">Primero agregá todos los invitados. Después, <b>enviá la confirmación de asistencia</b> para saber quiénes realmente van a venir.</p>
+        <div class="flex flex-col md:flex-row gap-6 md:gap-8 mb-8">
+            {{-- -------- CARD 1: Invitación individual -------- --}}
+            <div class="flex-1 bg-white border-2 border-blue-300 rounded-xl shadow-md p-6 flex flex-col items-stretch">
+                <div class="flex items-center mb-4">
+                    <span class="inline-block bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold mr-2">INVITACIÓN INDIVIDUAL</span>
+                </div>
+                <form method="POST" action="{{ route('eventos.invitados.agregar', $evento->id) }}" class="flex flex-col gap-2">
+                    @csrf
+                    <label for="email" class="font-semibold">Email del invitado</label>
+                    <input type="email" name="email" id="email" required
+                        class="py-2 px-4 border border-gray-300 rounded w-full mb-2"
+                        placeholder="ejemplo@mail.com"/>
+                    <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded font-semibold">
+                        Agregar invitado
+                    </button>
+                </form>
+            </div>
+            {{-- -------- CARD 2: Invitación masiva XLS -------- --}}
+            <div class="flex-1 bg-white border-2 border-emerald-400 rounded-xl shadow-md p-6 flex flex-col items-stretch">
+                <div class="flex items-center mb-4">
+                    <span class="inline-block bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold mr-2">INVITACIÓN MASIVA XLS</span>
+                </div>
+                <form method="POST" action="{{ route('eventos.invitaciones.importarExcel', $evento->id) }}" enctype="multipart/form-data" class="flex flex-col gap-2">
+                    @csrf
+                    <label for="archivo_invitados" class="font-semibold">Importar invitados (Excel, xls/xlsx)</label>
+                    <input type="file" name="archivo_invitados" id="archivo_invitados" accept=".xls,.xlsx" required
+                        class="py-2 px-4 border border-gray-300 rounded w-full mb-2" />
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded font-semibold">
+                        Importar invitados
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {{-- Tabla de TODOS los invitados --}}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 shadow-sm border mt-4">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Email</th>
+                        <th class="px-4 py-2 text-left">Confirmación enviada</th>
+                        <th class="px-4 py-2 text-left">Confirmado</th>
+                        <th class="px-4 py-2">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($invitados as $inv)
+                        <tr>
+                            <td class="px-4 py-2">{{ $inv->email }}</td>
+                            <td class="px-4 py-2">
+                                {!! $inv->enviada ? '<span class="text-green-700 font-bold">Sí</span>' : '<span class="text-yellow-700 font-bold">No</span>' !!}
+                            </td>
+                            <td class="px-4 py-2">
+                                @if($inv->confirmado)
+                                    <span class="text-green-700">Sí</span>
+                                @elseif($inv->confirmado === 0)
+                                    <span class="text-red-700">Rechazado</span>
+                                @else
+                                    <span class="text-gray-500">Pendiente</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-2 flex gap-2">
+                                {{-- Solo botón ENVIAR si no fue enviada la confirmación --}}
+                                @if(!$inv->enviada)
+                                    <form method="POST" action="{{ route('eventos.invitaciones.enviar', ['evento' => $evento->id, 'invitacion' => $inv->id]) }}">
+                                        @csrf
+                                        <button class="bg-blue-500 text-white px-3 py-1 rounded text-xs">Enviar pedido de confirmación</button>
+                                    </form>
+                                @endif
+
+                                {{-- Botón ELIMINAR --}}
+                                <form method="POST" action="{{ route('eventos.invitados.eliminar', [$evento->id, $inv->id]) }}" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
+                                        onclick="return confirm('¿Seguro que querés eliminar este invitado? Esta acción no se puede deshacer.')">
+                                        Eliminar
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="px-4 py-6 text-gray-600 text-center">No hay invitados cargados.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        {{-- Botón masivo para pedidos de confirmación --}}
+        @if($invitados->where('enviada', false)->count())
+        <form method="POST" action="{{ url('/eventos/' . $evento->id . '/invitaciones/enviar-masivo') }}" class="mt-6">
             @csrf
-            <label for="email" class="font-semibold mb-1">Email del invitado</label>
-            <input type="email" name="email" id="email" required
-                   class="py-2 px-4 border border-gray-300 rounded w-full"
-                   placeholder="ejemplo@mail.com"/>
-            <button type="submit"
-                class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-2 rounded font-semibold mt-2">
-                Agregar invitado
+            <button type="submit" class="px-6 py-2 bg-green-700 hover:bg-green-800 text-white rounded font-semibold w-full md:w-auto">
+                Enviar pedido de confirmación a TODOS los que faltan
             </button>
         </form>
-        {{-- Formulario de Importar invitados --}}
-        <form method="POST" action="{{ route('eventos.invitaciones.importarExcel', $evento->id) }}" enctype="multipart/form-data" class="flex flex-col gap-2 w-full md:w-1/2 bg-gray-50 border rounded p-4">
-            @csrf
-            <label for="archivo_invitados" class="font-semibold mb-1">Importar invitados (Excel)</label>
-            <input type="file" name="archivo_invitados" id="archivo_invitados" accept=".xls,.xlsx" required
-                   class="py-2 px-4 border border-gray-300 rounded w-full" />
-            <button type="submit" class="bg-green-700 hover:bg-green-800 text-white px-5 py-2 rounded font-semibold mt-2">
-                Importar invitados
-            </button>
-        </form>
+        @endif
     </div>
 
-    {{-- Listado de invitados --}}
-    <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-gray-200 shadow-sm border">
-        <thead class="bg-gray-100">
-            <tr>
-                <th class="px-4 py-2 text-left">Email</th>
-                <th class="px-4 py-2 text-left">Enviada</th>
-                <th class="px-4 py-2 text-left">Confirmado</th>
-                <th class="px-4 py-2 text-left">Datos completados</th>
-                <th class="px-4 py-2">Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($invitados as $inv)
-                <tr>
-                    <td class="px-4 py-2">{{ $inv->email }}</td>
-                    <td class="px-4 py-2">
-                        @if($inv->enviada)
-                            <span class="text-green-700">Sí</span>
-                        @else
-                            <span class="text-yellow-700">No</span>
-                        @endif
-                    </td>
-                    <td class="px-4 py-2">
-                        @if($inv->confirmado)
-                            <span class="text-green-700 font-bold">Confirmado</span>
-                        @elseif($inv->confirmado === 0)
-                            <span class="text-red-700 font-bold">Rechazado</span>
-                        @else
-                            <span class="text-gray-500">Pendiente</span>
-                        @endif
-                    </td>
-                    <td class="px-4 py-2">
-                        @if($inv->datos_completados)
-                            <span class="text-green-700">Sí</span>
-                        @else
-                            <span class="text-gray-500">No</span>
-                        @endif
-                    </td>
-                    <td class="px-4 py-2 flex gap-2">
-                        {{-- Acción individual: enviar notificación --}}
-                        @if(!$inv->enviada)
-                        <form method="POST" action="{{ route('eventos.invitaciones.enviar', ['evento' => $evento->id, 'invitacion' => $inv->id]) }}">
-                            @csrf
-                            <button class="bg-blue-500 text-white px-3 py-1 rounded text-xs">Enviar</button>
-                        </form>
-                        @endif
+    {{-- ========= PASO 2 ========= --}}
+    <div class="p-6 rounded-lg border bg-white shadow-sm">
+        <div class="flex items-center mb-4">
+            <span class="flex items-center justify-center bg-indigo-700 text-white text-4xl font-extrabold rounded-full w-14 h-14 mr-6 shadow-lg border-4 border-indigo-300 select-none">
+                2
+            </span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 uppercase tracking-tight">
+                Enviar invitación definitiva sólo a los que confirmaron
+            </h2>
+        </div>
+        <p class="mb-4 text-gray-500">
+            Cuando algunos invitados CONFIRMEN, desde aquí podés mandarles la invitación definitiva (con QR, PDF, etc).
+        </p>
 
-                        {{-- BOTÓN ELIMINAR INVITADO --}}
-                        <form method="POST" action="{{ route('eventos.invitados.eliminar', [$evento->id, $inv->id]) }}" style="display:inline;">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
-                                onclick="return confirm('¿Seguro que querés eliminar este invitado? Esta acción no se puede deshacer.')">
-                                Eliminar
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-            @empty
+        <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 shadow-sm border mt-4">
+            <thead class="bg-gray-100">
                 <tr>
-                    <td colspan="5" class="px-4 py-6 text-gray-600 text-center">No hay invitados cargados.</td>
+                    <th class="px-4 py-2 text-left">Email</th>
+                    <th class="px-4 py-2 text-left">Confirmado</th>
+                    <th class="px-4 py-2 text-left">Invitación enviada</th>
+                    <th class="px-4 py-2">Acciones</th>
                 </tr>
-            @endforelse
-        </tbody>
-    </table>
-    </div>
+            </thead>
+            <tbody>
+                @forelse($invitados->where('confirmado', true) as $inv)
+                    <tr>
+                        <td class="px-4 py-2">{{ $inv->email }}</td>
+                        <td class="px-4 py-2"><span class="text-green-700 font-bold">Sí</span></td>
+                        <td class="px-4 py-2">
+                            {!! $inv->invitacion_enviada ? '<span class="text-green-700 font-bold">Sí</span>' : '<span class="text-yellow-700 font-bold">No</span>' !!}
+                        </td>
+                        <td class="px-4 py-2">
+                            @if(!$inv->invitacion_enviada)
+                                <form method="POST" action="{{ route('eventos.invitaciones.enviarFinal', [$evento->id, $inv->id]) }}">
+                                    @csrf
+                                    <button class="bg-indigo-600 text-white px-3 py-1 rounded text-xs">
+                                        Enviar invitación definitiva
+                                    </button>
+                                </form>
+                            @else
+                                <span class="text-gray-500 text-xs">Enviada</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4" class="px-4 py-6 text-gray-600 text-center">Todavía nadie confirmó asistencia.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        </div>
 
-    {{-- Acciones masivas/Finales --}}
-    <div class="flex flex-col md:flex-row gap-4 mt-8 justify-end">
-    <form method="POST" action="{{ url('/eventos/' . $evento->id . '/invitaciones/enviar-masivo') }}">
-    @csrf
-    <button type="submit" class="px-5 py-2 bg-green-700 hover:bg-green-800 text-white rounded font-semibold text-base">
-        
-        Enviar notificaciones pendientes
-    </button>
-    </form>
-        <form method="POST" action="{{ route('eventos.invitaciones.enviarFinales', $evento->id) }}">
+        {{-- Botón masivo para enviarles invitaciones definitivas --}}
+        @if($invitados->where('confirmado', true)->where('invitacion_enviada', false)->count())
+        <form method="POST" action="{{ route('eventos.invitaciones.enviarFinales', $evento->id) }}" class="mt-6">
             @csrf
-            <button type="submit"
-                class="px-5 py-2 bg-green-700 hover:bg-green-800 text-white rounded font-semibold text-base">
-                Enviar invitaciones a confirmados
+            <button type="submit" class="px-6 py-2 bg-indigo-700 hover:bg-indigo-900 text-white rounded font-semibold w-full md:w-auto">
+                Enviar invitación definitiva a TODOS los confirmados
             </button>
         </form>
+        @endif
     </div>
 @endsection

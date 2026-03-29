@@ -37,4 +37,8 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('role:superadmin')
         ->name('eventos.cambiar-admin');
     // ==========================================================================================
+    Route::middleware(['auth', 'role:superadmin|admin_evento|subadmin_evento'])->group(function () {
+        Route::get('/admin/tickets/solicitudes', [TicketSolicitudController::class, 'index'])
+            ->name('admin.tickets.solicitudes');
+    });
 });

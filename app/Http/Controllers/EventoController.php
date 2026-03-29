@@ -222,8 +222,9 @@ class EventoController extends Controller
     public function show(Evento $evento)
     {
         $this->authorize('view', $evento);
-        $evento->load('tickets', 'adminPersona');
-        return view('eventos.show', compact('evento'));
+        $evento->load('tickets', 'adminPersona', 'tiposEntrada');   // ⬅️ Cargás la relación tipos de entrada
+        $tiposEntrada = $evento->tiposEntrada;                      // ⬅️ La extraés para la vista
+        return view('eventos.show', compact('evento', 'tiposEntrada'));
     }
 
     public function edit(Evento $evento)
