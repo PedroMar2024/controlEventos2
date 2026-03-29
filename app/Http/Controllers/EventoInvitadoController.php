@@ -13,10 +13,12 @@ class EventoInvitadoController extends Controller
     // Vista PRINCIPAL de gestión de invitados
     public function gestion(Evento $evento)
     {
-        //$evento = Evento::findOrFail($eventoId);
         $invitados = InvitacionEvento::where('evento_id', $evento->id)->get();
-
-        return view('eventos.invitados.gestion', compact('evento', 'invitados'));
+    
+        // Colección filtrada: confirmados y no invitados
+        $confirmadosNoInvitados = $invitados->where('confirmado', true)->where('invitacion_enviada', false);
+    
+        return view('eventos.invitados.gestion', compact('evento', 'invitados', 'confirmadosNoInvitados'));
     }
 
     // Form para agregar invitado MANUAL/MASIVO

@@ -127,66 +127,69 @@
 
     {{-- ========= PASO 2 ========= --}}
     <div class="p-6 rounded-lg border bg-white shadow-sm">
-        <div class="flex items-center mb-4">
-            <span class="flex items-center justify-center bg-indigo-700 text-white text-4xl font-extrabold rounded-full w-14 h-14 mr-6 shadow-lg border-4 border-indigo-300 select-none">
-                2
-            </span>
-            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 uppercase tracking-tight">
-                Enviar invitación definitiva sólo a los que confirmaron
-            </h2>
-        </div>
-        <p class="mb-4 text-gray-500">
-            Cuando algunos invitados CONFIRMEN, desde aquí podés mandarles la invitación definitiva (con QR, PDF, etc).
-        </p>
+    <div class="flex items-center mb-4">
+        <span class="flex items-center justify-center bg-indigo-700 text-white text-4xl font-extrabold rounded-full w-14 h-14 mr-6 shadow-lg border-4 border-indigo-300 select-none">
+            2
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 uppercase tracking-tight">
+            Enviar invitación definitiva sólo a los que confirmaron
+        </h2>
+    </div>
+    <p class="mb-4 text-gray-500">
+        Cuando algunos invitados CONFIRMEN, desde aquí podés mandarle la invitación definitiva o eliminarlos si no querés que participen.
+    </p>
 
-        <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 shadow-sm border mt-4">
-            <thead class="bg-gray-100">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 shadow-sm border mt-4 bg-gray-50">
+            <thead>
                 <tr>
+                    <th class="px-4 py-2 text-left">Nombre</th>
+                    <th class="px-4 py-2 text-left">Apellido</th>
                     <th class="px-4 py-2 text-left">Email</th>
-                    <th class="px-4 py-2 text-left">Confirmado</th>
-                    <th class="px-4 py-2 text-left">Invitación enviada</th>
-                    <th class="px-4 py-2">Acciones</th>
+                    <th class="px-4 py-2 text-left">Situación</th>
+                    <th class="px-4 py-2">Eliminar</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($invitados->where('confirmado', true) as $inv)
+                @forelse($confirmadosNoInvitados as $inv)
                     <tr>
+                        <td class="px-4 py-2">{{ $inv->nombre }}</td>
+                        <td class="px-4 py-2">{{ $inv->apellido }}</td>
                         <td class="px-4 py-2">{{ $inv->email }}</td>
-                        <td class="px-4 py-2"><span class="text-green-700 font-bold">Sí</span></td>
                         <td class="px-4 py-2">
-                            {!! $inv->invitacion_enviada ? '<span class="text-green-700 font-bold">Sí</span>' : '<span class="text-yellow-700 font-bold">No</span>' !!}
+                            @if($inv->invitacion_enviada)
+                                <span class="text-green-700 font-bold">Enviada</span>
+                            @else
+                                <span class="text-yellow-700 font-bold">No enviada</span>
+                            @endif
                         </td>
                         <td class="px-4 py-2">
-                            @if(!$inv->invitacion_enviada)
-                                <form method="POST" action="{{ route('eventos.invitaciones.enviarFinal', [$evento->id, $inv->id]) }}">
-                                    @csrf
-                                    <button class="bg-indigo-600 text-white px-3 py-1 rounded text-xs">
-                                        Enviar invitación definitiva
-                                    </button>
-                                </form>
-                            @else
-                                <span class="text-gray-500 text-xs">Enviada</span>
-                            @endif
+                            <form method="POST" action="{{ route('eventos.invitados.eliminar', [$evento->id, $inv->id]) }}" style="display:inline;">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
+                                    onclick="return confirm('¿Seguro que querés eliminar este invitado? Esta acción no se puede deshacer.')">
+                                    Eliminar
+                                </button>
+                            </form>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-4 py-6 text-gray-600 text-center">Todavía nadie confirmó asistencia.</td>
+                        <td colspan="5" class="px-4 py-6 text-gray-600 text-center">Todavía nadie confirmó asistencia.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-        </div>
+    </div>
 
-        {{-- Botón masivo para enviarles invitaciones definitivas --}}
-        @if($invitados->where('confirmado', true)->where('invitacion_enviada', false)->count())
+    @if($confirmadosNoInvitados->count())
         <form method="POST" action="{{ route('eventos.invitaciones.enviarFinales', $evento->id) }}" class="mt-6">
             @csrf
             <button type="submit" class="px-6 py-2 bg-indigo-700 hover:bg-indigo-900 text-white rounded font-semibold w-full md:w-auto">
-                Enviar invitación definitiva a TODOS los confirmados
+                Enviar invitación definitiva a TODOS los confirmados sin invitación
             </button>
         </form>
-        @endif
-    </div>
+    @endif
+</div>
 @endsection
