@@ -88,6 +88,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('invitacion.confirmar.procesar');
         Route::get('/admin/tickets/solicitudes', [TicketSolicitudController::class, 'index'])
         ->name('admin.tickets.solicitudes');
+        
         // Grupo de rutas para admin, opcionalmente con prefix/middleware según tu estructura
     Route::post('/admin/tickets/solicitudes/{id}/aprobar', [\App\Http\Controllers\TicketSolicitudController::class, 'aprobar'])
         ->name('admin.tickets.solicitudes.aprobar');

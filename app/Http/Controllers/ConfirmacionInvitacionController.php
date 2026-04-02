@@ -25,72 +25,88 @@ class ConfirmacionInvitacionController extends Controller
         ]);
     }
 
-    // Procesa la respuesta de confirmación/rechazo
     public function procesarForm(Request $request)
-    {
-        $data = $request->validate([
-            'token'      => 'required|string',
-            'accion'     => 'required|in:confirmar,rechazar',
-            'nombre'     => 'nullable|string|max:255',
-            'apellido'   => 'nullable|string|max:255',
-            'dni'        => 'nullable|string|max:32',
-        ]);
+{
+    \Log::info('==[INICIO procesarForm]==', $request->all());
 
-        $invitacion = InvitacionEvento::where('token', $data['token'])->first();
-
-        // Analogia: el portero chequea la ficha en la lista
+    try {
+        // 1. Buscar invitación por token
+        $token = $request->input('token');
+        $invitacion = \App\Models\InvitacionEvento::where('token', $token)->first();
         if (!$invitacion) {
+            \Log::warning('==[NO SE ENCONTRÓ INVITACION]==', ['token' => $token]);
             return view('eventos.invitados.invitacion_no_encontrada');
         }
 
-        // Si ya recibió la invitación final (masivo con QR), no puede confirmar de nuevo
-        if ($invitacion->enviada) {
-            return view('eventos.invitados.invitacion_ya_enviada');
+        // 2. Armar reglas de validación dinámicas
+        $rules = [
+            'token'    => 'required|string',
+            'accion'   => 'required|in:confirmar,rechazar',
+        ];
+        if (!$invitacion->datos_completados) {
+            $rules['nombre']   = 'required|string|max:255';
+            $rules['apellido'] = 'required|string|max:255';
+            $rules['dni']      = 'required|string|max:32';
         }
 
-        DB::beginTransaction();
+        $data = $request->validate($rules);
+        \Log::info('==[VALIDEZ DATA]==', $data);
+
+        \DB::beginTransaction();
         try {
-            // Registra SIEMPRE los datos en la invitación (nombre, apellido, dni)
-            $invitacion->nombre = $data['nombre'] ?? '';
-            $invitacion->apellido = $data['apellido'] ?? '';
-            $invitacion->dni = $data['dni'] ?? '';
-            $invitacion->datos_completados = true; // Marca como ficha "completa"
+            // 3. Actualizar SOLO los campos que existen en invitaciones_evento
+            $invitacion->datos_completados = true;
             $invitacion->fecha_confirmacion = now();
+            $invitacion->confirmado = ($data['accion'] === 'confirmar' ? 1 : 0);
+            $invitacion->save();
+            \Log::info('==[GUARDADA invitacion]==', $invitacion->fresh()->toArray());
 
-            if ($data['accion'] === 'confirmar') {
-                $invitacion->confirmado = 1;
-
-                // Buscar o actualizar datos de la persona usando updateOrCreate
-                $persona = Persona::updateOrCreate(
+            // 4. Si llegaron los datos personales, actualizar/crear persona
+            if (isset($data['nombre']) && isset($data['apellido']) && isset($data['dni'])) {
+                \Log::info('==[ANTES DE UPDATEORCREATE persona]', [
+                    'email' => $invitacion->email,
+                    'nombre' => $data['nombre'],
+                    'apellido' => $data['apellido'],
+                    'dni' => $data['dni'],
+                ]);
+                $persona = \App\Models\Persona::updateOrCreate(
                     ['email' => $invitacion->email],
                     [
-                        'nombre'   => $data['nombre'] ?? '',
-                        'apellido' => $data['apellido'] ?? '',
-                        'dni'      => $data['dni'] ?? '',
+                        'nombre'   => $data['nombre'],
+                        'apellido' => $data['apellido'],
+                        'dni'      => $data['dni'],
                     ]
                 );
+                \Log::info('==[GUARDADA persona]', $persona->toArray());
 
-                // Asociar la persona al evento como invitado, evitando duplicados
-                $evento = Evento::find($invitacion->evento_id);
+                // VINCULAR PERSONA-EVENTO si hay relación
+                $evento = \App\Models\Evento::find($invitacion->evento_id);
+                \Log::info('==[BUSCADO evento]', ['id' => $invitacion->evento_id, 'encontrado' => $evento ? true : false]);
                 if ($evento && method_exists($evento, 'personas')) {
                     $evento->personas()->syncWithoutDetaching([
                         $persona->id => ['role' => 'invitado']
                     ]);
+                    \Log::info('==[ASOCIADA persona con evento]', ['persona_id' => $persona->id, 'evento_id' => $evento->id]);
                 }
-            } else {
-                // Si rechaza, solo marca como no confirmado
-                $invitacion->confirmado = 0;
-                // Los datos igual quedan guardados por arriba
             }
 
-            $invitacion->save();
-
-            DB::commit();
-
+            \DB::commit();
+            \Log::info('==[FIN OK procesarForm]==', ['token' => $data['token']]);
             return view('eventos.invitados.confirmacion_final', ['invitacion' => $invitacion]);
-        } catch (\Throwable $ex) {
-            DB::rollBack();
-            return redirect()->back()->with('error', 'Ocurrió un error al registrar tu respuesta.');
+        } catch (\Throwable $ex2) {
+            \DB::rollBack();
+            \Log::error('==[ERROR DENTRO DE LA TRANSACCION]==', [
+                'mensaje' => $ex2->getMessage(),
+                'trace' => $ex2->getTraceAsString()
+            ]);
+            throw $ex2;
         }
+    } catch (\Throwable $ex) {
+        \Log::error('==[ERROR GLOBAL EN procesarForm]==', [
+            'mensaje' => $ex->getMessage(),
+            'trace' => $ex->getTraceAsString()
+        ]);
+        return redirect()->back()->with('error', 'Ocurrió un error al registrar tu respuesta.');
     }
+}
 }

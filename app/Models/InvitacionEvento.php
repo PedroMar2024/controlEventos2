@@ -16,6 +16,7 @@ class InvitacionEvento extends Model
         'fecha_envio',
         'fecha_confirmacion',
         'datos_completados',
+        'confirmado',   // <----- AGREGA ESTO!
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class InvitacionEvento extends Model
         'datos_completados' => 'boolean',
         'fecha_envio' => 'datetime',
         'fecha_confirmacion' => 'datetime',
+        'confirmado' => 'boolean',
     ];
 
     // Relación (opcional) con evento

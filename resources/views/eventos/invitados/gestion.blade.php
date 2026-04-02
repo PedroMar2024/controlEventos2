@@ -73,19 +73,22 @@
                 <tbody>
                     @forelse($invitados as $inv)
                         <tr>
+                                @php
+                                    $estado = is_null($inv->confirmado) ? null : intval($inv->confirmado);
+                                @endphp
                             <td class="px-4 py-2">{{ $inv->email }}</td>
                             <td class="px-4 py-2">
                                 {!! $inv->enviada ? '<span class="text-green-700 font-bold">Sí</span>' : '<span class="text-yellow-700 font-bold">No</span>' !!}
                             </td>
                             <td class="px-4 py-2">
-                                @if($inv->confirmado)
+                                @if($estado === 1)
                                     <span class="text-green-700">Sí</span>
-                                @elseif($inv->confirmado === 0)
+                                @elseif($estado === 0)
                                     <span class="text-red-700">Rechazado</span>
                                 @else
                                     <span class="text-gray-500">Pendiente</span>
                                 @endif
-                            </td>
+</td>
                             <td class="px-4 py-2 flex gap-2">
                                 {{-- Solo botón ENVIAR si no fue enviada la confirmación --}}
                                 @if(!$inv->enviada)
