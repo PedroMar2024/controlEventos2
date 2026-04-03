@@ -81,17 +81,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/eventos/{evento}/invitaciones/enviar-finales', [EventoInvitadoController::class, 'enviarInvitacionesFinales'])
         ->name('eventos.invitaciones.enviarFinales');
 
-    // ---- CONFIRMACIONES ----
-    Route::get('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'verForm'])
-        ->name('invitacion.confirmar');
-    Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
-        ->name('invitacion.confirmar.procesar');
+
         Route::get('/admin/tickets/solicitudes', [TicketSolicitudController::class, 'index'])
         ->name('admin.tickets.solicitudes');
-        
+
         // Grupo de rutas para admin, opcionalmente con prefix/middleware según tu estructura
     Route::post('/admin/tickets/solicitudes/{id}/aprobar', [\App\Http\Controllers\TicketSolicitudController::class, 'aprobar'])
         ->name('admin.tickets.solicitudes.aprobar');
+        Route::put('/eventos/{evento}/invitados/{invitado}/cambiar-cantidad', [EventoInvitadoController::class, 'cambiarCantidad'])
+        ->name('eventos.invitados.cambiar_cantidad');
 });
 Route::get('/eventos/{evento}/comprar', [EventoCompraController::class, 'showForm'])
     ->name('eventos.publico.comprar');
@@ -99,7 +97,11 @@ Route::get('/eventos/{evento}/comprar', [EventoCompraController::class, 'showFor
 Route::post('/eventos/{evento}/comprar', [EventoCompraController::class, 'procesarCompra'])
     ->name('eventos.publico.comprar.procesar');
     // Procesar solicitud de compra de entradas para eventos públicos (POST)
-
+    // ---- CONFIRMACIONES ----
+    Route::get('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'verForm'])
+        ->name('invitacion.confirmar');
+    Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
+        ->name('invitacion.confirmar.procesar');
 // ---- Otros módulos ----
 require __DIR__.'/eventos_equipo.php';
 require __DIR__.'/auth.php';

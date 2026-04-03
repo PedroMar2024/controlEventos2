@@ -94,7 +94,6 @@
                             @else
                                 <label class="block text-sm font-medium text-gray-700">Estado</label>
                                 <div class="mt-1 block w-full rounded-md border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
-                                    <!-- el admin ve el estado fijo, el valor viene de old o default -->
                                     {{ ucfirst(old('estado', 'pendiente')) }}
                                 </div>
                                 <input type="hidden" name="estado" value="{{ old('estado', 'pendiente') }}">
@@ -167,8 +166,8 @@
                         @error('descripcion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
-                    @include('eventos._tickets')
-
+                    {{-- REMOVIDO: @include('eventos._tickets') Aquí NO VA en el create --}}
+                    
                     <div class="flex items-center gap-3">
                         <button type="submit"
                                 class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">

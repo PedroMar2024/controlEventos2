@@ -12,11 +12,12 @@ class CreateInvitacionesEventoTable extends Migration
             $table->id();
             $table->unsignedBigInteger('evento_id');
             $table->string('email');
-            $table->string('token', 100)->nullable();
-            $table->boolean('enviada')->default(false);
-            $table->timestamp('fecha_envio')->nullable();
-            $table->timestamp('fecha_confirmacion')->nullable();
-            $table->boolean('datos_completados')->default(false);
+            $table->integer('cantidad')->default(1); // <<--- NUEVO: cantidad de personas habilitadas por esa invitación
+            $table->string('token', 100)->nullable(); // Se usará para QR
+            $table->boolean('enviada')->default(false); // Marcar si ya se envió la invitación
+            $table->timestamp('fecha_envio')->nullable(); // Fecha-hora de envío del mail
+            $table->timestamp('fecha_confirmacion')->nullable(); // Cuando respondió
+            $table->boolean('datos_completados')->default(false); // Si llenó datos extra
             $table->timestamps();
 
             $table->foreign('evento_id')->references('id')->on('eventos')->onDelete('cascade');

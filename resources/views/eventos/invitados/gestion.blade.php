@@ -73,9 +73,9 @@
                 <tbody>
                     @forelse($invitados as $inv)
                         <tr>
-                                @php
-                                    $estado = is_null($inv->confirmado) ? null : intval($inv->confirmado);
-                                @endphp
+                            @php
+                                $estado = is_null($inv->confirmado) ? null : intval($inv->confirmado);
+                            @endphp
                             <td class="px-4 py-2">{{ $inv->email }}</td>
                             <td class="px-4 py-2">
                                 {!! $inv->enviada ? '<span class="text-green-700 font-bold">Sí</span>' : '<span class="text-yellow-700 font-bold">No</span>' !!}
@@ -88,7 +88,7 @@
                                 @else
                                     <span class="text-gray-500">Pendiente</span>
                                 @endif
-</td>
+                            </td>
                             <td class="px-4 py-2 flex gap-2">
                                 {{-- Solo botón ENVIAR si no fue enviada la confirmación --}}
                                 @if(!$inv->enviada)
@@ -139,9 +139,19 @@
         </h2>
     </div>
     <p class="mb-4 text-gray-500">
-        Cuando algunos invitados CONFIRMEN, desde aquí podés mandarle la invitación definitiva o eliminarlos si no querés que participen.
+        Cuando algunos invitados CONFIRMEN, desde aquí podés mandarle la invitación definitiva o eliminarlos si no querés que participen.<br>
+        <span class="font-bold text-indigo-700">
+            Recordá: la invitación se enviará sólo a quienes no tengan la invitación definitiva enviada.<br>
+            Chequeá la <b>cantidad</b> asignada: si no la cambiás, será uno por defecto.
+        </span>
     </p>
 
+    @php
+        $totalPersonas = $confirmadosNoInvitados->sum('cantidad');
+    @endphp
+    <div class="mb-2 font-bold text-indigo-700">
+        Total de personas invitadas (sumando cantidades): {{ $totalPersonas }}
+    </div>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 shadow-sm border mt-4 bg-gray-50">
             <thead>
@@ -149,6 +159,7 @@
                     <th class="px-4 py-2 text-left">Nombre</th>
                     <th class="px-4 py-2 text-left">Apellido</th>
                     <th class="px-4 py-2 text-left">Email</th>
+                    <th class="px-4 py-2 text-center">Cantidad</th>
                     <th class="px-4 py-2 text-left">Situación</th>
                     <th class="px-4 py-2">Eliminar</th>
                 </tr>
@@ -159,6 +170,17 @@
                         <td class="px-4 py-2">{{ $inv->nombre }}</td>
                         <td class="px-4 py-2">{{ $inv->apellido }}</td>
                         <td class="px-4 py-2">{{ $inv->email }}</td>
+                                                <td class="px-4 py-2 text-center">
+                            <input 
+                                type="number" 
+                                name="cantidades[{{ $inv->id }}]" 
+                                value="{{ $inv->cantidad ?? 1 }}" 
+                                min="1" 
+                                class="border border-gray-300 rounded px-2 py-1 w-16 text-center"
+                                style="width: 60px;"
+                                title="Cantidad de personas habilitadas para este invitado"
+                            />
+                        </td>
                         <td class="px-4 py-2">
                             @if($inv->invitacion_enviada)
                                 <span class="text-green-700 font-bold">Enviada</span>
@@ -179,7 +201,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-6 text-gray-600 text-center">Todavía nadie confirmó asistencia.</td>
+                        <td colspan="6" class="px-4 py-6 text-gray-600 text-center">Todavía nadie confirmó asistencia.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -189,7 +211,11 @@
     @if($confirmadosNoInvitados->count())
         <form method="POST" action="{{ route('eventos.invitaciones.enviarFinales', $evento->id) }}" class="mt-6">
             @csrf
-            <button type="submit" class="px-6 py-2 bg-indigo-700 hover:bg-indigo-900 text-white rounded font-semibold w-full md:w-auto">
+            <button 
+                type="submit"
+                class="px-6 py-2 bg-indigo-700 hover:bg-indigo-900 text-white rounded font-semibold w-full md:w-auto"
+                onclick="return confirm('Vas a enviar la invitación DEFINITIVA a TODOS los confirmados cuya invitación final no fue enviada. Revisá la CANTIDAD de invitados permitidos para cada invitado, sino será solo para una persona por defecto. ¿Deseás continuar?');"
+            >
                 Enviar invitación definitiva a TODOS los confirmados sin invitación
             </button>
         </form>
