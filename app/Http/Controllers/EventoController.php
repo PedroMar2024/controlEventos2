@@ -7,6 +7,8 @@ use App\Models\Persona;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Laravel\Facades\Image;
 use Throwable;
 use App\Models\User;
 use Illuminate\Support\Facades\Password;
@@ -74,6 +76,7 @@ class EventoController extends Controller
             $rulesBase = [
                 'nombre'        => ['required','string','max:255'],
                 'descripcion'   => ['nullable','string'],
+                'imagen'        => ['nullable','image','mimes:jpeg,jpg,png,webp,gif','max:5120'],
                 'fecha_evento'  => [
                     'required',
                     'date',
@@ -184,7 +187,7 @@ class EventoController extends Controller
             // Crear evento
             $evento = new Evento();
             foreach ($evento->getFillable() as $col) {
-                if (array_key_exists($col, $data)) {
+                if (array_key_exists($col, $data) && $col !== 'imagen') {
                     $evento->{$col} = $data[$col];
                 }
             }
@@ -196,6 +199,12 @@ class EventoController extends Controller
                 $evento->estado = 'pendiente';
             }
             $evento->save();
+
+            // Procesar y guardar imagen del evento con Imagick
+            if ($request->hasFile('imagen')) {
+                $evento->imagen = $this->processAndStoreImage($request->file('imagen'), $evento->id);
+                $evento->save();
+            }
 
             // Pivot rol admin/subadmin
             if (method_exists($evento, 'personas')) {
@@ -240,6 +249,7 @@ class EventoController extends Controller
             $validated = $request->validate([
                 'nombre'        => ['required','string','max:255'],
                 'descripcion'   => ['nullable','string'],
+                'imagen'        => ['nullable','image','mimes:jpeg,jpg,png,webp,gif','max:5120'],
                 'fecha_evento'  => [
                     'required',
                     'date',
@@ -278,7 +288,7 @@ class EventoController extends Controller
             $validated['reingreso'] = $request->boolean('reingreso');
 
             foreach ($evento->getFillable() as $col) {
-                if (array_key_exists($col, $validated)) {
+                if (array_key_exists($col, $validated) && $col !== 'imagen') {
                     $evento->{$col} = $validated[$col];
                 }
             }
@@ -296,6 +306,16 @@ class EventoController extends Controller
             if (!$user->hasRole('superadmin')) {
                 $evento->estado = $evento->getOriginal('estado');
             }
+
+            // Procesar y guardar nueva imagen del evento con Imagick (si se subió una)
+            if ($request->hasFile('imagen')) {
+                // Eliminar imagen anterior si existe
+                if ($evento->imagen) {
+                    Storage::disk('public')->delete($evento->imagen);
+                }
+                $evento->imagen = $this->processAndStoreImage($request->file('imagen'), $evento->id);
+            }
+
             $evento->save();
 
             Log::info('UPDATE provincia AFTER', [
@@ -557,5 +577,22 @@ class EventoController extends Controller
             'success' => true,
             'mensaje' => 'Invitado agregado a la bandeja. Cuando decidas, podrás enviarle la notificación.'
         ]);
+    }
+
+    /**
+     * Procesa la imagen subida con Imagick, la redimensiona y la guarda en el disco público.
+     * Devuelve la ruta relativa al disco 'public'.
+     */
+    private function processAndStoreImage(\Illuminate\Http\UploadedFile $file, int $eventoId): string
+    {
+        $filename = 'eventos/' . $eventoId . '_' . Str::random(8) . '.webp';
+
+        $image = Image::read($file->getRealPath())
+            ->scaleDown(width: 1200, height: 800)
+            ->toWebp(quality: 85);
+
+        Storage::disk('public')->put($filename, $image);
+
+        return $filename;
     }
 }

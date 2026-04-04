@@ -20,6 +20,7 @@ class Evento extends Model
         'capacidad',
         'estado',
         'descripcion',
+        'imagen',
         'precio_evento',
         'publico',
         'reingreso',

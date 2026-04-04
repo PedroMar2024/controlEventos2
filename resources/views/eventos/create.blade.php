@@ -22,7 +22,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('eventos.store') }}" class="space-y-8" id="create-event-form">
+                <form method="POST" action="{{ route('eventos.store') }}" class="space-y-8" id="create-event-form" enctype="multipart/form-data">
                     @csrf
 
                     {{-- SOLO EL SUPERADMIN VE EL BLOQUE DE ADMIN DEL EVENTO --}}
@@ -164,6 +164,14 @@
                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
                                   placeholder="Detalles del evento, agenda, notas, etc.">{{ old('descripcion') }}</textarea>
                         @error('descripcion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Imagen del evento</label>
+                        <p class="mt-1 text-xs text-gray-500">Formato: JPG, PNG, WebP o GIF. Máximo 5 MB. Se optimizará automáticamente con Imagick.</p>
+                        <input type="file" name="imagen" accept="image/jpeg,image/png,image/webp,image/gif"
+                               class="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100">
+                        @error('imagen') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- REMOVIDO: @include('eventos._tickets') Aquí NO VA en el create --}}

@@ -21,7 +21,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('eventos.update', $evento->id) }}" class="space-y-8">
+                <form method="POST" action="{{ route('eventos.update', $evento->id) }}" class="space-y-8" enctype="multipart/form-data">
                     @csrf
                     @method('PATCH')
 
@@ -61,6 +61,21 @@
                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
                         >{{ old('descripcion', $evento->descripcion) }}</textarea>
                         @error('descripcion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Imagen del evento</label>
+                        <p class="mt-1 text-xs text-gray-500">Formato: JPG, PNG, WebP o GIF. Máximo 5 MB. Se optimizará automáticamente con Imagick.</p>
+                        @if($evento->imagen)
+                            <div class="mt-2 mb-3">
+                                <img src="{{ Storage::disk('public')->url($evento->imagen) }}" alt="Imagen actual del evento"
+                                     class="h-32 w-auto rounded-md border border-gray-200 object-cover shadow-sm">
+                                <p class="mt-1 text-xs text-gray-500">Imagen actual. Subí una nueva para reemplazarla.</p>
+                            </div>
+                        @endif
+                        <input type="file" name="imagen" accept="image/jpeg,image/png,image/webp,image/gif"
+                               class="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100">
+                        @error('imagen') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">

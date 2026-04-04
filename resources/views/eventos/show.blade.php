@@ -30,6 +30,13 @@
           </span>
         </div>
         <p class="mt-1 text-sm text-gray-600">{{ $evento->descripcion }}</p>
+        @if($evento->imagen)
+            <div class="mt-4">
+                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($evento->imagen) }}"
+                     alt="Imagen del evento {{ $evento->nombre }}"
+                     class="max-h-64 w-auto rounded-xl border border-gray-200 object-cover shadow">
+            </div>
+        @endif
       </div>
 
       <!-- Cuerpo de la entrada -->
