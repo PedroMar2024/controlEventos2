@@ -30,12 +30,13 @@
             Válida para <b>{{ $invitado->cantidad ?? 1 }}</b> persona{{ ($invitado->cantidad ?? 1) > 1 ? 's' : '' }}
         </div>
         
-        <<div class="qr">
-        @if(!empty($qrPng))
-    <img src="data:image/png;base64,{{ $qrPng }}" alt="QR de invitación" width="150" height="150"/>
-@else
-    <div style="color: red;">SIN QR DISPONIBLE</div>
-@endif
+        <div class="qr">
+    @if(!empty($qrSvg))
+        {!! $qrSvg !!}
+    @else
+        <div style="color: red;">SIN QR DISPONIBLE</div>
+    @endif
+</div>
 </div>
 <div style="font-size: 10px; color: red;">
     {!! isset($qrSvg) ? 'SVG PRESENTE' : 'SVG AUSENTE' !!}

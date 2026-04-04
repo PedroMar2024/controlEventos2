@@ -297,7 +297,8 @@ class EventoInvitadoController extends Controller
 
             // --- GENERAR EL QR CON LA LIBRERÍA NUEVA (SimpleSoftwareIO) ---
             $qrData = route('invitacion.confirmar', ['token' => $inv->token]);
-            $qrPng = base64_encode(QrCode::format('png')->size(180)->margin(5)->generate($qrData, null, 'imagick'));
+            // Generar QR en SVG (no necesita Imagick)
+$qrSvg = QrCode::format('svg')->size(180)->margin(5)->generate($qrData);
 
             // PASÁS $qrPng al Blade para PDF
             $pdf = Pdf::loadView('eventos.pdf.invitacion', [
@@ -305,7 +306,7 @@ class EventoInvitadoController extends Controller
                 'invitado' => $inv,
                 'nombre' => $nombre,
                 'apellido' => $apellido,
-                'qrPng' => $qrPng,
+                'qrSvg' => $qrSvg,  // ← Cambiar qrPng por qrSvg
             ]);
             Log::info('[PDF] Generado OK', ['invitacion_id' => $inv->id]);
 
