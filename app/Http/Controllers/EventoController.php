@@ -582,6 +582,11 @@ class EventoController extends Controller
     /**
      * Procesa la imagen subida con Imagick, la redimensiona y la guarda en el disco público.
      * Devuelve la ruta relativa al disco 'public'.
+     *
+     * scaleDown mantiene la relación de aspecto y solo escala hacia abajo si la imagen supera
+     * las dimensiones indicadas (1200 px de ancho o 800 px de alto). Las imágenes más pequeñas
+     * no se ampliarán. La imagen resultante se convierte a WebP al 85 % de calidad y se le
+     * eliminan los metadatos (Exif, IPTC, etc.) gracias a la opción 'strip' del config.
      */
     private function processAndStoreImage(\Illuminate\Http\UploadedFile $file, int $eventoId): string
     {
