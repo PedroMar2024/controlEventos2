@@ -19,6 +19,7 @@ class CreateInvitacionesEventoTable extends Migration
             $table->timestamp('fecha_confirmacion')->nullable(); // Cuando respondió
             $table->boolean('datos_completados')->default(false); // Si llenó datos extra
             $table->timestamps();
+            $table->boolean('enviada_invitacion')->default(false);
 
             $table->foreign('evento_id')->references('id')->on('eventos')->onDelete('cascade');
             $table->unique(['evento_id', 'email']); // No pueden cargarse dos veces mismo email para un evento

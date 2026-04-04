@@ -6,7 +6,11 @@ use Illuminate\Http\Request;
 use App\Models\Evento;
 use App\Models\InvitacionEvento;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Barryvdh\DomPDF\Facade\Pdf;
+use SimpleSoftwareIO\QrCode\Facades\QrCode; 
+
 
 class EventoInvitadoController extends Controller
 {
@@ -242,64 +246,121 @@ class EventoInvitadoController extends Controller
         }
     }
 
-    public function enviarInvitacionesFinales(\Illuminate\Http\Request $request, $eventoId)
+    public function enviarInvitacionesFinales(Request $request, $eventoId)
 {
-    $evento = \App\Models\Evento::findOrFail($eventoId);
+    Log::info('[INICIO] enviarInvitacionesFinales', ['eventoId' => $eventoId]);
+    $evento = Evento::findOrFail($eventoId);
 
-    // Guardar las cantidades antes de enviar nada:
+    // Guardar cantidades
     $cantidades = $request->input('cantidades', []);
+    Log::info('[CANTIDADES] Recibidas', $cantidades);
+
     foreach ($cantidades as $invitacionId => $valor) {
-        $invitacion = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
-                                ->where('id', $invitacionId)
-                                ->first();
+        $invitacion = InvitacionEvento::where('evento_id', $evento->id)
+            ->where('id', $invitacionId)
+            ->first();
+
         if ($invitacion) {
             $invitacion->cantidad = max(1, intval($valor));
             $invitacion->save();
+            Log::info('[CANTIDADES] Actualizada', [
+                'invitacionId' => $invitacionId,
+                'nueva_cantidad' => $invitacion->cantidad
+            ]);
         }
     }
 
-    // Buscar invitados confirmados y NO enviados
-    $invitados = \App\Models\InvitacionEvento::where('evento_id', $evento->id)
+    // Invitados confirmados sin invitación definitiva enviada
+    $invitados = InvitacionEvento::where('evento_id', $evento->id)
         ->where('confirmado', 1)
         ->where(function($q) {
-            $q->whereNull('enviada')->orWhere('enviada', false)->orWhere('enviada', 0);
+            $q->whereNull('enviada_invitacion')
+              ->orWhere('enviada_invitacion', false)
+              ->orWhere('enviada_invitacion', 0);
         })
         ->get();
 
+    Log::info('[ENVIAR] Invitados a procesar', ['cantidad' => count($invitados)]);
     $enviadas_ok = [];
     $enviadas_error = [];
 
     foreach ($invitados as $inv) {
+        Log::info('[ENVIAR] Procesando invitado', [
+            'id' => $inv->id,
+            'email' => $inv->email,
+            'enviada_invitacion' => $inv->enviada_invitacion
+        ]);
         try {
-            // GENERAR PDF bonito usando una vista Blade tipo pdf/invitacion.blade.php
-            $pdf = \PDF::loadView('pdf.invitacion', [
+            $persona = \App\Models\Persona::where('email', $inv->email)->first();
+            $nombre = $persona->nombre ?? 'Sin nombre';
+            $apellido = $persona->apellido ?? '';
+
+            // --- GENERAR EL QR CON LA LIBRERÍA NUEVA (SimpleSoftwareIO) ---
+            $qrData = route('invitacion.confirmar', ['token' => $inv->token]);
+            $qrPng = base64_encode(QrCode::format('png')->size(180)->margin(5)->generate($qrData, null, 'imagick'));
+
+            // PASÁS $qrPng al Blade para PDF
+            $pdf = Pdf::loadView('eventos.pdf.invitacion', [
                 'evento' => $evento,
                 'invitado' => $inv,
-                // Otros datos que necesites (nombre, qr, cantidad, etc)
+                'nombre' => $nombre,
+                'apellido' => $apellido,
+                'qrPng' => $qrPng,
             ]);
+            Log::info('[PDF] Generado OK', ['invitacion_id' => $inv->id]);
 
-            \Mail::send([], [], function ($message) use ($inv, $evento, $pdf) {
+            Mail::send([], [], function ($message) use ($inv, $evento, $pdf) {
                 $message->to($inv->email)
-                        ->subject('Invitación al evento: ' . $evento->nombre)
-                        ->setBody('Adjuntamos su invitación en PDF. Sin ese archivo no se podrá ingresar.', 'text/html')
-                        ->attachData($pdf->output(), 'invitacion.pdf');
+                    ->subject('Invitación al evento: ' . $evento->nombre)
+                    ->html('Adjuntamos su invitación en PDF. Sin ese archivo no se podrá ingresar.')
+                    ->attachData($pdf->output(), 'invitacion.pdf');
             });
+            Log::info('[MAIL] Enviado OK', ['email' => $inv->email]);
 
-            $inv->enviada = true;
+            // Marcar como enviada
+            $inv->enviada_invitacion = true;
             $inv->fecha_envio = now();
             $inv->save();
+
             $enviadas_ok[] = $inv->email;
         } catch (\Throwable $ex) {
+            Log::error('[ERROR] Al enviar invitación', [
+                'id' => $inv->id,
+                'email' => $inv->email,
+                'msg' => $ex->getMessage(),
+            ]);
             $enviadas_error[] = $inv->email;
         }
     }
+
+    Log::info('[FIN] enviarInvitacionesFinales', [
+        'enviadas_ok' => $enviadas_ok,
+        'enviadas_error' => $enviadas_error
+    ]);
 
     return redirect()->back()->with('status',
         'Invitaciones finales enviadas: ' . count($enviadas_ok) .
         ($enviadas_error ? '. Errores: ' . implode(', ', $enviadas_error) : '')
     );
 }
-    public function eliminarInvitado($eventoId, $invitadoId)
+
+    public function cambiarCantidad(\Illuminate\Http\Request $request, $eventoId, $invitadoId)
+{
+    $request->validate([
+        'cantidad' => 'required|integer|min:1',
+    ]);
+    // Modelo: podés tenerlo como EventoInvitado, InvitacionEvento, etc.
+    // Cambialo por el modelo real si el tuyo se llama diferente:
+    $invitado = \App\Models\InvitacionEvento::where('evento_id', $eventoId)
+        ->where('id', $invitadoId)
+        ->firstOrFail();
+
+    $invitado->cantidad = $request->input('cantidad');
+    $invitado->save();
+
+    return back()->with('status', 'Cantidad actualizada correctamente.');
+}
+public function eliminarInvitado($eventoId, $invitadoId)
     {
         $evento = \App\Models\Evento::findOrFail($eventoId);
         $invitacion = \App\Models\InvitacionEvento::findOrFail($invitadoId);
@@ -331,20 +392,4 @@ class EventoInvitadoController extends Controller
 
         return redirect()->back()->with('status', $msg);
     }
-    public function cambiarCantidad(\Illuminate\Http\Request $request, $eventoId, $invitadoId)
-{
-    $request->validate([
-        'cantidad' => 'required|integer|min:1',
-    ]);
-    // Modelo: podés tenerlo como EventoInvitado, InvitacionEvento, etc.
-    // Cambialo por el modelo real si el tuyo se llama diferente:
-    $invitado = \App\Models\InvitacionEvento::where('evento_id', $eventoId)
-        ->where('id', $invitadoId)
-        ->firstOrFail();
-
-    $invitado->cantidad = $request->input('cantidad');
-    $invitado->save();
-
-    return back()->with('status', 'Cantidad actualizada correctamente.');
-}
 }

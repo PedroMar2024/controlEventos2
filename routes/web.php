@@ -102,6 +102,7 @@ Route::post('/eventos/{evento}/comprar', [EventoCompraController::class, 'proces
         ->name('invitacion.confirmar');
     Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
         ->name('invitacion.confirmar.procesar');
+        Route::get('/demo-qr', [App\Http\Controllers\QrDemoController::class, 'show']);
 // ---- Otros módulos ----
 require __DIR__.'/eventos_equipo.php';
 require __DIR__.'/auth.php';

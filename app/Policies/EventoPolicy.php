@@ -4,7 +4,7 @@ namespace App\Policies;
 
 use App\Models\Evento;
 use App\Models\User;
-
+use Illuminate\Support\Facades\Log;
 class EventoPolicy
 {
     // Superadmin pasa cualquier ability (incluida 'delete')

@@ -20,7 +20,7 @@
         <h2>INVITACIÓN AL EVENTO</h2>
         <div class="evento">{{ $evento->nombre }}</div>
 
-        <div class="dato"><b>Invitado:</b> {{ $invitado->nombre ?? 'Sin nombre' }} {{ $invitado->apellido ?? '' }}</div>
+        <div class="dato"><b>Invitado:</b> {{ $nombre }} {{ $apellido }}</div>
         <div class="dato"><b>Email:</b> {{ $invitado->email }}</div>
         @if(isset($invitado->dni))
             <div class="dato"><b>DNI:</b> {{ $invitado->dni }}</div>
@@ -30,17 +30,16 @@
             Válida para <b>{{ $invitado->cantidad ?? 1 }}</b> persona{{ ($invitado->cantidad ?? 1) > 1 ? 's' : '' }}
         </div>
         
-        <div class="qr">
-            @php
-                $qrData = $invitado->token ?? '';
-            @endphp
-            @if($qrData)
-                {!! QrCode::size(110)->margin(1)->generate($qrData) !!}
-                <div style="font-size:11px; color:#888; margin-top:4px;">Código QR único</div>
-            @else
-                <div style="color:red;">SIN CÓDIGO</div>
-            @endif
-        </div>
+        <<div class="qr">
+        @if(!empty($qrPng))
+    <img src="data:image/png;base64,{{ $qrPng }}" alt="QR de invitación" width="150" height="150"/>
+@else
+    <div style="color: red;">SIN QR DISPONIBLE</div>
+@endif
+</div>
+<div style="font-size: 10px; color: red;">
+    {!! isset($qrSvg) ? 'SVG PRESENTE' : 'SVG AUSENTE' !!}
+</div>
         <div class="leyenda">
             Presentá esta invitación (impresa o digital) al ingresar.<br>
             <b>No se podrá ingresar sin este comprobante y QR.</b>
