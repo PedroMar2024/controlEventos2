@@ -54,22 +54,22 @@ class AccesoEventoController extends Controller
     }
 
     // MÉTODO 3: Escanear QR y registrar entrada/salida
-    public function escanearQr(Request $request, Evento $evento)
+    // MÉTODO 3: Escanear QR y registrar entrada/salida
+public function escanearQr(Request $request, Evento $evento)
 {
     $request->validate([
-        'token' => 'required|string'
+        'token' => 'required|string',
+        'personas' => 'nullable|integer|min:1', // ← NUEVO: cantidad de personas
     ]);
 
-    // ========== CAMBIO IMPORTANTE: BUSCAR POR token_acceso ==========
-    // Antes buscábamos por 'token' (el de confirmación)
-    // Ahora buscamos por 'token_acceso' (el del QR de ingreso)
+    // Buscar invitación por token_acceso
     $invitacion = InvitacionEvento::where('token_acceso', $request->token)
         ->where('evento_id', $evento->id)
         ->where('confirmado', 1)
         ->first();
 
     if (!$invitacion) {
-        \Log::warning('[ACCESO] Token no encontrado', [
+        Log::warning('[ACCESO] Token no encontrado', [
             'token_recibido' => $request->token,
             'evento_id' => $evento->id
         ]);
@@ -81,7 +81,7 @@ class AccesoEventoController extends Controller
     }
 
     // Obtener persona asociada
-    $persona = \App\Models\Persona::where('email', $invitacion->email)->first();
+    $persona = Persona::where('email', $invitacion->email)->first();
 
     if (!$persona) {
         return response()->json([
@@ -90,32 +90,63 @@ class AccesoEventoController extends Controller
         ], 400);
     }
 
-    // Determinar tipo de acceso (entrada o salida)
-    $ultimoAcceso = \App\Models\AccesoEvento::where('invitacion_id', $invitacion->id)
+    // ========== NUEVO: CALCULAR CUÁNTAS PERSONAS ESTÁN ADENTRO DE ESTA INVITACIÓN ==========
+    $personasDentro = AccesoEvento::where('invitacion_id', $invitacion->id)
+        ->where('evento_id', $evento->id)
+        ->sum(DB::raw('CASE WHEN tipo = "entrada" THEN personas_ingresadas ELSE -personas_ingresadas END'));
+
+    // Cantidad de personas que quieren ingresar/salir (por defecto 1)
+    $personasMovimiento = $request->input('personas', 1);
+
+    // Determinar tipo de acceso
+    $ultimoAcceso = AccesoEvento::where('invitacion_id', $invitacion->id)
         ->where('evento_id', $evento->id)
         ->orderBy('fecha_hora', 'desc')
         ->first();
 
     $tipo = (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') ? 'entrada' : 'salida';
 
+    // ========== VALIDAR SEGÚN EL TIPO ==========
+    if ($tipo === 'entrada') {
+        // Validar que no excedan el límite
+        if (($personasDentro + $personasMovimiento) > $invitacion->cantidad) {
+            $disponibles = $invitacion->cantidad - $personasDentro;
+            return response()->json([
+                'success' => false,
+                'message' => "Solo quedan {$disponibles} lugares disponibles de {$invitacion->cantidad}."
+            ], 400);
+        }
+    } else {
+        // Validar que no salgan más de los que están adentro
+        if ($personasMovimiento > $personasDentro) {
+            return response()->json([
+                'success' => false,
+                'message' => "Solo hay {$personasDentro} personas adentro. No pueden salir {$personasMovimiento}."
+            ], 400);
+        }
+    }
+
     // Registrar el acceso
-    \App\Models\AccesoEvento::create([
+    AccesoEvento::create([
         'evento_id' => $evento->id,
         'invitacion_id' => $invitacion->id,
         'persona_id' => $persona->id,
         'tipo' => $tipo,
+        'personas_ingresadas' => $personasMovimiento,
         'fecha_hora' => now(),
     ]);
 
-    \Log::info('[ACCESO] Registrado correctamente', [
+    Log::info('[ACCESO QR] Registrado', [
         'tipo' => $tipo,
         'persona' => $persona->nombre . ' ' . $persona->apellido,
+        'personas_movimiento' => $personasMovimiento,
+        'personas_dentro_ahora' => $tipo === 'entrada' ? $personasDentro + $personasMovimiento : $personasDentro - $personasMovimiento,
         'evento_id' => $evento->id
     ]);
 
-    // Calcular personas adentro AHORA
-    $dentroAhora = \App\Models\AccesoEvento::from('accesos_evento as a1')
-        ->join(\DB::raw('(select invitacion_id, MAX(fecha_hora) as ultima_fecha 
+    // Calcular total de personas adentro del evento
+    $dentroAhora = AccesoEvento::from('accesos_evento as a1')
+        ->join(DB::raw('(select invitacion_id, MAX(fecha_hora) as ultima_fecha 
                           from accesos_evento 
                           where evento_id = ' . $evento->id . ' and tipo = "entrada" 
                           group by invitacion_id) as ult'), function($join) {
@@ -123,7 +154,7 @@ class AccesoEventoController extends Controller
                  ->on('a1.fecha_hora', '=', 'ult.ultima_fecha');
         })
         ->whereNotExists(function($query) {
-            $query->select(\DB::raw(1))
+            $query->select(DB::raw(1))
                   ->from('accesos_evento as a2')
                   ->whereColumn('a2.invitacion_id', 'a1.invitacion_id')
                   ->where('a2.tipo', 'salida')
@@ -134,6 +165,9 @@ class AccesoEventoController extends Controller
     return response()->json([
         'success' => true,
         'tipo' => $tipo,
+        'personas_movimiento' => $personasMovimiento,
+        'personas_dentro_invitacion' => $tipo === 'entrada' ? $personasDentro + $personasMovimiento : $personasDentro - $personasMovimiento,
+        'total_permitido' => $invitacion->cantidad,
         'persona' => [
             'nombre' => $persona->nombre,
             'apellido' => $persona->apellido,
@@ -143,22 +177,17 @@ class AccesoEventoController extends Controller
     ]);
 }
 
-    // MÉTODO 4: Ingreso manual por DNI
-    // MÉTODO 4: Ingreso manual por DNI
+   
+// MÉTODO 4: Ingreso manual por DNI
+// MÉTODO 4: Ingreso manual por DNI
 // MÉTODO 4: Ingreso manual por DNI
 public function ingresoManual(Request $request, Evento $evento)
-   // ========== DEBUG TEMPORAL ==========
-   Log::info('========== INGRESO MANUAL INICIADO ==========');
-   Log::info('DNI recibido', ['dni' => $request->dni]);
-   Log::info('Evento ID', ['evento_id' => $evento->id]);
-   Log::info('Request completo', ['request' => $request->all()]);
-   // =====================================
-   
 {
     $this->authorize('manageGuests', $evento);
 
     $request->validate([
         'dni' => 'required|string',
+        'personas' => 'nullable|integer|min:1', // ← NUEVO: cantidad de personas
     ]);
 
     // Buscar persona por DNI
@@ -171,7 +200,7 @@ public function ingresoManual(Request $request, Evento $evento)
         ], 400);
     }
 
-    // Buscar invitación por email de esa persona
+    // Buscar invitación por email de esa persona EN ESTE EVENTO
     $invitacion = InvitacionEvento::where('email', $persona->email)
         ->where('evento_id', $evento->id)
         ->where('confirmado', 1)
@@ -184,41 +213,94 @@ public function ingresoManual(Request $request, Evento $evento)
         ], 400);
     }
 
-    // Verificar si está adentro o afuera
+    // ========== CALCULAR CUÁNTAS PERSONAS ESTÁN ADENTRO DE ESTA INVITACIÓN ==========
+    $personasDentro = AccesoEvento::where('invitacion_id', $invitacion->id)
+        ->where('evento_id', $evento->id)
+        ->sum(DB::raw('CASE WHEN tipo = "entrada" THEN personas_ingresadas ELSE -personas_ingresadas END'));
+
+    // Cantidad de personas que quieren ingresar/salir (por defecto 1)
+    $personasMovimiento = $request->input('personas', 1);
+
+    // Determinar tipo de acceso
     $ultimoAcceso = AccesoEvento::where('invitacion_id', $invitacion->id)
         ->where('evento_id', $evento->id)
         ->orderBy('fecha_hora', 'desc')
         ->first();
 
-    // Determinar el tipo de movimiento
-    if (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') {
-        $tipo = 'entrada';
+    $tipo = (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') ? 'entrada' : 'salida';
+
+    // ========== VALIDAR SEGÚN EL TIPO ==========
+    if ($tipo === 'entrada') {
+        // Validar que no excedan el límite
+        if (($personasDentro + $personasMovimiento) > $invitacion->cantidad) {
+            $disponibles = $invitacion->cantidad - $personasDentro;
+            return response()->json([
+                'success' => false,
+                'message' => "Solo quedan {$disponibles} lugares disponibles de {$invitacion->cantidad}."
+            ], 400);
+        }
     } else {
-        $tipo = 'salida';
+        // Validar que no salgan más de los que están adentro
+        if ($personasMovimiento > $personasDentro) {
+            return response()->json([
+                'success' => false,
+                'message' => "Solo hay {$personasDentro} personas adentro. No pueden salir {$personasMovimiento}."
+            ], 400);
+        }
     }
 
     // Registrar el acceso
     AccesoEvento::create([
         'evento_id' => $evento->id,
         'invitacion_id' => $invitacion->id,
+        'persona_id' => $persona->id,
         'tipo' => $tipo,
-        'metodo' => 'manual',
-        'registrado_por' => auth()->id(),
+        'personas_ingresadas' => $personasMovimiento,
+        'fecha_hora' => now(),
     ]);
 
-    // ========== DEVOLVER JSON IGUAL QUE escanearQr ==========
+    Log::info('[ACCESO MANUAL] Registrado', [
+        'tipo' => $tipo,
+        'persona' => $persona->nombre . ' ' . $persona->apellido,
+        'dni' => $persona->dni,
+        'personas_movimiento' => $personasMovimiento,
+        'personas_dentro_ahora' => $tipo === 'entrada' ? $personasDentro + $personasMovimiento : $personasDentro - $personasMovimiento,
+        'evento_id' => $evento->id
+    ]);
+
+    // Calcular cuántos están adentro AHORA (copiado del QR)
+    $dentroAhora = AccesoEvento::from('accesos_evento as a1')
+        ->join(DB::raw('(select invitacion_id, MAX(fecha_hora) as ultima_fecha 
+                          from accesos_evento 
+                          where evento_id = ' . $evento->id . ' and tipo = "entrada" 
+                          group by invitacion_id) as ult'), function($join) {
+            $join->on('a1.invitacion_id', '=', 'ult.invitacion_id')
+                 ->on('a1.fecha_hora', '=', 'ult.ultima_fecha');
+        })
+        ->whereNotExists(function($query) {
+            $query->select(DB::raw(1))
+                  ->from('accesos_evento as a2')
+                  ->whereColumn('a2.invitacion_id', 'a1.invitacion_id')
+                  ->where('a2.tipo', 'salida')
+                  ->whereColumn('a2.fecha_hora', '>', 'a1.fecha_hora');
+        })
+        ->count();
+
+    // Devolver JSON (igual que el QR)
     return response()->json([
         'success' => true,
         'tipo' => $tipo,
+        'personas_movimiento' => $personasMovimiento,
+        'personas_dentro_invitacion' => $tipo === 'entrada' ? $personasDentro + $personasMovimiento : $personasDentro - $personasMovimiento,
+        'total_permitido' => $invitacion->cantidad,
         'persona' => [
-            'nombre' => $persona->nombre ?? 'Sin datos',
-            'apellido' => $persona->apellido ?? '',
-            'email' => $invitacion->email,
+            'nombre' => $persona->nombre,
+            'apellido' => $persona->apellido,
+            'dni' => $persona->dni,
         ],
-        'dentro_ahora' => $this->contarDentroAhora($evento->id),
+        'dentro_ahora' => $dentroAhora,
     ]);
 }
-
     // MÉTODO 5: Obtener historial de accesos (para mostrar en tabla)
     public function historial(Evento $evento)
     {

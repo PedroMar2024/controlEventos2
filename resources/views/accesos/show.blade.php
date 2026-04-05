@@ -97,13 +97,27 @@
             <p class="text-gray-600 mb-4">Si el QR no funciona, ingresá el DNI manualmente.</p>
             <form id="form-ingreso-manual">
                 @csrf
+                
+                <!-- DNI del invitado -->
                 <label for="dni" class="block text-sm font-semibold mb-2">DNI del invitado:</label>
                 <input type="text" 
-                    name="dni" 
-                    id="dni-input"
-                    placeholder="Ej: 12345678" 
-                    required
-                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-3 focus:border-emerald-500 focus:outline-none">
+                       name="dni" 
+                       id="dni-input"
+                       placeholder="Ej: 12345678" 
+                       required
+                       class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-4 focus:border-emerald-500 focus:outline-none">
+                
+                <!-- Cantidad de personas -->
+                <label for="personas-manual" class="block text-sm font-semibold mb-2">¿Cuántas personas?</label>
+                <input type="number" 
+                       name="personas" 
+                       id="personas-manual"
+                       value="1"
+                       min="1"
+                       max="10"
+                       required
+                       class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-4 focus:border-emerald-500 focus:outline-none">
+                
                 <button type="submit" 
                         class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold">
                     ✅ Registrar Acceso
@@ -118,6 +132,69 @@
            class="inline-block bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold">
             📋 Ver Historial de Accesos
         </a>
+    </div>
+</div>
+
+<!-- ========================================
+     MODAL FLOTANTE PARA MOSTRAR RESULTADO
+     ======================================== -->
+<div id="modal-resultado" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <!-- Header del modal -->
+        <div id="modal-header" class="px-6 py-4 text-white text-center">
+            <h3 id="modal-titulo" class="text-2xl font-bold"></h3>
+        </div>
+        
+        <!-- Contenido del modal -->
+        <div class="px-6 py-6">
+            <!-- Información de la persona -->
+            <div class="mb-6">
+                <p class="text-lg font-semibold text-gray-800 mb-2" id="modal-nombre"></p>
+                <p class="text-sm text-gray-600" id="modal-email"></p>
+                <p class="text-sm text-gray-600" id="modal-dni"></p>
+            </div>
+            
+            <hr class="my-4 border-gray-300">
+            
+            <!-- Información del movimiento -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-700 font-medium">Personas en este movimiento:</span>
+                    <span id="modal-personas-movimiento" class="text-xl font-bold text-indigo-600"></span>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-700 font-medium">Personas adentro (esta invitación):</span>
+                    <span id="modal-personas-dentro" class="text-xl font-bold text-emerald-600"></span>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-700 font-medium">Total permitido:</span>
+                    <span id="modal-total-permitido" class="text-xl font-bold text-gray-800"></span>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-700 font-medium">Lugares disponibles:</span>
+                    <span id="modal-disponibles" class="text-xl font-bold text-orange-600"></span>
+                </div>
+            </div>
+            
+            <hr class="my-4 border-gray-300">
+            
+            <!-- Total en el evento -->
+            <div class="bg-indigo-50 rounded-lg p-4 text-center">
+                <p class="text-sm text-gray-600 mb-1">Total personas en el evento</p>
+                <p id="modal-total-evento" class="text-3xl font-bold text-indigo-600"></p>
+            </div>
+        </div>
+        
+        <!-- Footer del modal -->
+        <div class="px-6 py-4 bg-gray-50 text-center">
+            <button onclick="cerrarModal()" 
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold text-lg w-full">
+                ACEPTAR
+            </button>
+        </div>
     </div>
 </div>
 
@@ -137,10 +214,48 @@ function actualizarReloj() {
     document.getElementById('reloj').textContent = `${horas}:${minutos}:${segundos}`;
 }
 
-// Actualizar el reloj cada segundo
 setInterval(actualizarReloj, 1000);
-// Llamar inmediatamente para no esperar 1 segundo
 actualizarReloj();
+
+// ========================================
+// FUNCIONES DEL MODAL
+// ========================================
+function mostrarModal(data) {
+    const modal = document.getElementById('modal-resultado');
+    const header = document.getElementById('modal-header');
+    const titulo = document.getElementById('modal-titulo');
+    
+    // Configurar color según tipo
+    if (data.tipo === 'entrada') {
+        header.className = 'px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-center';
+        titulo.textContent = '✅ ENTRADA REGISTRADA';
+    } else {
+        header.className = 'px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center';
+        titulo.textContent = '🔽 SALIDA REGISTRADA';
+    }
+    
+    // Llenar datos de la persona
+    document.getElementById('modal-nombre').textContent = `👤 ${data.persona.nombre} ${data.persona.apellido}`;
+    document.getElementById('modal-email').textContent = `📧 ${data.persona.email}`;
+    document.getElementById('modal-dni').textContent = data.persona.dni ? `🎫 DNI: ${data.persona.dni}` : '';
+    
+    // Llenar datos del movimiento
+    document.getElementById('modal-personas-movimiento').textContent = data.personas_movimiento || 1;
+    document.getElementById('modal-personas-dentro').textContent = data.personas_dentro_invitacion || 0;
+    document.getElementById('modal-total-permitido').textContent = data.total_permitido || 0;
+    
+    const disponibles = (data.total_permitido || 0) - (data.personas_dentro_invitacion || 0);
+    document.getElementById('modal-disponibles').textContent = disponibles;
+    
+    document.getElementById('modal-total-evento').textContent = data.dentro_ahora || 0;
+    
+    // Mostrar modal
+    modal.classList.remove('hidden');
+}
+
+function cerrarModal() {
+    document.getElementById('modal-resultado').classList.add('hidden');
+}
 
 // ========================================
 // ESCÁNER QR
@@ -174,7 +289,6 @@ function abrirEscanerQR() {
     
     html5QrCodeScanner = new Html5Qrcode("reader");
     
-    // Configuración del escáner
     const config = { 
         fps: 10, 
         qrbox: { width: 250, height: 250 },
@@ -182,7 +296,7 @@ function abrirEscanerQR() {
     };
     
     html5QrCodeScanner.start(
-        { facingMode: "environment" }, // Cámara trasera en móviles
+        { facingMode: "environment" },
         config,
         onScanSuccess,
         onScanError
@@ -210,55 +324,42 @@ function cerrarEscanerQR() {
 }
 
 function onScanSuccess(decodedText, decodedResult) {
-    // Detener el escáner temporalmente para evitar múltiples lecturas
     cerrarEscanerQR();
-    
     mostrarEstado('⏳ Procesando código QR...', 'info');
     
-    // Extraer el token de la URL escaneada
     let token = '';
-    
-    // Caso 1: Si es una URL completa (http://dominio.com/evento/ingreso?token=XXX)
     if (decodedText.includes('?token=')) {
         token = decodedText.split('?token=')[1];
-    } 
-    // Caso 2: Si es solo el token (XXX)
-    else if (!decodedText.includes('/') && !decodedText.includes('http')) {
+    } else if (!decodedText.includes('/') && !decodedText.includes('http')) {
         token = decodedText;
-    }
-    // Caso 3: Cualquier otro formato, intentar extraer
-    else {
+    } else {
         token = decodedText.split('/').pop().split('?token=').pop();
     }
     
-    console.log('QR escaneado:', decodedText);
-    console.log('Token extraído:', token);
-    
-    // Enviar al servidor
     fetch("{{ route('accesos.escanear-qr', $evento->id) }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
-        body: JSON.stringify({ token: token })
+        body: JSON.stringify({ 
+            token: token,
+            personas: 1
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            const tipoTexto = data.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
-            const emoji = data.tipo === 'entrada' ? '✅' : '🔽';
-            
-            alert(`${emoji} ${tipoTexto} registrada\n\nPersona: ${data.persona.nombre} ${data.persona.apellido}\nEmail: ${data.persona.email}`);
-            
             // Actualizar contadores
             document.getElementById('contador-dentro').textContent = data.dentro_ahora;
             const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
             document.getElementById('contador-faltantes').textContent = faltantes;
             
-            mostrarEstado(`✅ ${tipoTexto} registrada correctamente`, 'success');
+            // Mostrar modal
+            mostrarModal(data);
             
-            // Reabrir el escáner después de 2 segundos
+            mostrarEstado(`✅ ${data.tipo.toUpperCase()} registrada correctamente`, 'success');
+            
             setTimeout(() => {
                 abrirEscanerQR();
             }, 2000);
@@ -275,19 +376,19 @@ function onScanSuccess(decodedText, decodedResult) {
 }
 
 function onScanError(errorMessage) {
-    // Ignorar errores menores de escaneo (es normal mientras enfoca)
+    // Ignorar errores menores
 }
+
 // ========================================
-// INGRESO MANUAL CON AJAX
-// ========================================
-// ========================================
-// INGRESO MANUAL (IGUAL QUE EL QR)
+// INGRESO MANUAL
 // ========================================
 document.getElementById('form-ingreso-manual').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const dniInput = document.getElementById('dni-input');
+    const personasInput = document.getElementById('personas-manual');
     const dni = dniInput.value.trim();
+    const personas = parseInt(personasInput.value) || 1;
     
     if (!dni) {
         alert('❌ Por favor ingresá un DNI');
@@ -300,23 +401,25 @@ document.getElementById('form-ingreso-manual').addEventListener('submit', functi
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
-        body: JSON.stringify({ dni: dni })
+        body: JSON.stringify({ 
+            dni: dni,
+            personas: personas
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            const tipoTexto = data.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
-            const emoji = data.tipo === 'entrada' ? '✅' : '🔽';
-            
-            alert(`${emoji} ${tipoTexto} registrada\n\nPersona: ${data.persona.nombre} ${data.persona.apellido}\nDNI: ${dni}`);
-            
             // Actualizar contadores
             document.getElementById('contador-dentro').textContent = data.dentro_ahora;
             const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
             document.getElementById('contador-faltantes').textContent = faltantes;
             
-            // Limpiar input
+            // Mostrar modal
+            mostrarModal(data);
+            
+            // Limpiar inputs
             dniInput.value = '';
+            personasInput.value = '1';
             dniInput.focus();
         } else {
             alert('❌ Error: ' + data.message);
