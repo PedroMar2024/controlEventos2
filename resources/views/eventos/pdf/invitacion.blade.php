@@ -31,8 +31,8 @@
         </div>
         
         <div class="qr">
-    @if(!empty($qrSvg))
-        {!! $qrSvg !!}
+    @if(!empty($qrPng))
+        <img src="data:image/png;base64,{{ $qrPng }}" alt="QR" width="150" height="150"/>
     @else
         <div style="color: red;">SIN QR DISPONIBLE</div>
     @endif
