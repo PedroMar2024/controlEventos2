@@ -6,22 +6,49 @@ use App\Http\Controllers\EventoController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\EventoInvitadoController;
 use App\Http\Controllers\EventoCompraController;
+use App\Http\Controllers\AccesoEventoController;
+use App\Http\Controllers\TicketSolicitudController;
+use App\Http\Controllers\ConfirmacionInvitacionController;
+use App\Http\Controllers\QrDemoController;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
 
+// ========================================
+// RUTAS PÚBLICAS (sin autenticación)
+// ========================================
+
 Route::get('/', fn () => view('welcome'));
 
+// Autenticación
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// Confirmación de invitación (enlace en email)
+Route::get('/invitacion/confirmar', [ConfirmacionInvitacionController::class, 'verForm'])
+    ->name('invitacion.confirmar');
+Route::post('/invitacion/confirmar', [ConfirmacionInvitacionController::class, 'procesarForm'])
+    ->name('invitacion.confirmar.procesar');
+
+// Compra pública de entradas (eventos públicos)
+Route::get('/eventos/{evento}/comprar', [EventoCompraController::class, 'showForm'])
+    ->name('eventos.publico.comprar');
+Route::post('/eventos/{evento}/comprar', [EventoCompraController::class, 'procesarCompra'])
+    ->name('eventos.publico.comprar.procesar');
+
+// Demo QR (para testing)
+Route::get('/demo-qr', [QrDemoController::class, 'show']);
+
+// ========================================
+// RUTAS AUTENTICADAS (requieren login)
+// ========================================
+
 Route::middleware(['auth'])->group(function () {
+    
+    // ---- DASHBOARD ----
     Route::get('/dashboard', fn () => view('dashboard'))->name('dashboard');
 
-    Route::get('/eventos', [EventoController::class, 'index'])->name('eventos.index');
-
-    Route::get('/personas/by-email', [PersonaController::class, 'findByEmail'])->name('personas.byEmail');
-
+    // ---- DEBUG (solo desarrollo) ----
     Route::get('/debug/roles', function () {
         return response()->json([
             'user_id' => auth()->id(),
@@ -29,81 +56,148 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('debug.roles');
 
-    // ---- Eventos ----
+    // ========================================
+    // GESTIÓN DE EVENTOS
+    // Roles: Superadmin, Admin Evento, Subadmin Evento
+    // ========================================
+
+    Route::get('/eventos', [EventoController::class, 'index'])->name('eventos.index');
     Route::get('/eventos/create', [EventoController::class, 'create'])->name('eventos.create');
     Route::post('/eventos', [EventoController::class, 'store'])->name('eventos.store');
     Route::get('/eventos/{evento}', [EventoController::class, 'show'])->name('eventos.show');
+    
+    // Editar evento (requiere permiso 'update')
     Route::get('/eventos/{evento}/edit', [EventoController::class, 'edit'])
-        ->middleware('can:update,evento')->name('eventos.edit');
+        ->middleware('can:update,evento')
+        ->name('eventos.edit');
     Route::patch('/eventos/{evento}', [EventoController::class, 'update'])
-        ->middleware('can:update,evento')->name('eventos.update');
+        ->middleware('can:update,evento')
+        ->name('eventos.update');
+    
+    // Eliminar evento (requiere permiso 'delete')
     Route::delete('/eventos/{evento}', [EventoController::class, 'destroy'])
-        ->middleware('can:delete,evento')->name('eventos.destroy');
+        ->middleware('can:delete,evento')
+        ->name('eventos.destroy');
+    
+    // Aprobar/Cancelar evento (solo superadmin)
     Route::post('/eventos/{evento}/aprobar', [EventoController::class, 'aprobar'])
-        ->middleware('can:approve,evento')->name('eventos.aprobar');
+        ->middleware('can:approve,evento')
+        ->name('eventos.aprobar');
     Route::post('/eventos/{evento}/cancelar', [EventoController::class, 'cancelar'])
-        ->middleware('can:cancel,evento')->name('eventos.cancelar');
+        ->middleware('can:cancel,evento')
+        ->name('eventos.cancelar');
+    
+    // Cambiar admin del evento (requiere permiso 'update')
     Route::post('/eventos/{evento}/cambiar-admin', [EventoController::class, 'cambiarAdmin'])
         ->middleware('can:update,evento')
         ->name('eventos.cambiar-admin');
 
-    // ---- INVITADOS Y NOTIFICACIONES ----
-    // Gestión y listado principal:
+    // ========================================
+    // GESTIÓN DE INVITADOS
+    // Roles: Superadmin, Admin Evento, Subadmin Evento
+    // Policy: manageGuests
+    // ========================================
+
+    // Página principal de gestión de invitados
     Route::get('/eventos/{evento}/invitados/gestion', [EventoInvitadoController::class, 'gestion'])
-        ->name('eventos.invitados.gestion')
-        ->middleware('can:manageGuests,evento');
+        ->middleware('can:manageGuests,evento')
+        ->name('eventos.invitados.gestion');
     
-    // Agregar individual:
+    // Agregar invitado individual
     Route::post('/eventos/{evento}/invitados/agregar', [EventoInvitadoController::class, 'agregarInvitado'])
-        ->name('eventos.invitados.agregar')
-        ->middleware('can:manageGuests,evento');
+        ->middleware('can:manageGuests,evento')
+        ->name('eventos.invitados.agregar');
     
-    // Importar desde Excel (único flujo masivo):
+    // Importar invitados desde Excel
     Route::post('/eventos/{evento}/invitaciones/importar', [EventoInvitadoController::class, 'importarDesdeExcel'])
-        ->name('eventos.invitaciones.importarExcel')
-        ->middleware('can:manageGuests,evento');
+        ->middleware('can:manageGuests,evento')
+        ->name('eventos.invitaciones.importarExcel');
     
-    // Eliminar invitado:
+    // Eliminar invitado
     Route::delete('/eventos/{evento}/invitados/{invitado}', [EventoInvitadoController::class, 'eliminarInvitado'])
         ->name('eventos.invitados.eliminar');
     
-    // Enviar notificaciones individuales:
-    Route::post('/eventos/{evento}/invitaciones/{invitacion}/enviar', [EventoInvitadoController::class, 'enviarInvitacionIndividual'])
-        ->name('eventos.invitaciones.enviar')
-        ->middleware('can:manageGuests,evento');
-
-    // Enviar notificaciones pendientes MASIVO:
-    Route::post('/eventos/{evento}/invitaciones/enviar-masivo', [EventoInvitadoController::class, 'enviarInvitacionesMasivo'])
-        ->name('eventos.invitaciones.enviarMasivo')
-        ->middleware('can:manageGuests,evento');
+    // Cambiar cantidad de personas permitidas por invitación
+    Route::put('/eventos/{evento}/invitados/{invitado}/cambiar-cantidad', [EventoInvitadoController::class, 'cambiarCantidad'])
+        ->name('eventos.invitados.cambiar_cantidad');
     
-    // Enviar a confirmados:
+    // ---- ENVÍO DE INVITACIONES ----
+    
+    // Enviar invitación individual (pedido de confirmación)
+    Route::post('/eventos/{evento}/invitaciones/{invitacion}/enviar', [EventoInvitadoController::class, 'enviarInvitacionIndividual'])
+        ->middleware('can:manageGuests,evento')
+        ->name('eventos.invitaciones.enviar');
+    
+    // Enviar pedido de confirmación masivo (a todos los pendientes)
+    Route::post('/eventos/{evento}/invitaciones/enviar-masivo', [EventoInvitadoController::class, 'enviarInvitacionesMasivo'])
+        ->middleware('can:manageGuests,evento')
+        ->name('eventos.invitaciones.enviarMasivo');
+    
+    // Enviar invitación definitiva a confirmados
     Route::post('/eventos/{evento}/invitaciones/enviar-finales', [EventoInvitadoController::class, 'enviarInvitacionesFinales'])
         ->name('eventos.invitaciones.enviarFinales');
 
+    // ========================================
+    // CONTROL DE ACCESO AL EVENTO
+    // Roles: Superadmin, Admin Evento, Subadmin Evento
+    // Policy: manageGuests
+    // ========================================
 
-        Route::get('/admin/tickets/solicitudes', [TicketSolicitudController::class, 'index'])
+    // Lista de eventos para control de acceso
+    Route::get('/accesos', [AccesoEventoController::class, 'index'])
+        ->name('accesos.index');
+    
+    // Página de control de un evento específico
+    Route::get('/accesos/{evento}', [AccesoEventoController::class, 'show'])
+        ->middleware('can:manageGuests,evento')
+        ->name('accesos.show');
+    
+    // Escanear QR (AJAX)
+    Route::post('/accesos/{evento}/escanear-qr', [AccesoEventoController::class, 'escanearQr'])
+        ->middleware('can:manageGuests,evento')
+        ->name('accesos.escanear-qr');
+    
+    // Ingreso manual por DNI
+    Route::post('/accesos/{evento}/ingreso-manual', [AccesoEventoController::class, 'ingresoManual'])
+        ->middleware('can:manageGuests,evento')
+        ->name('accesos.ingreso-manual');
+    
+    // Historial de accesos
+    Route::get('/accesos/{evento}/historial', [AccesoEventoController::class, 'historial'])
+        ->middleware('can:manageGuests,evento')
+        ->name('accesos.historial');
+
+    // ========================================
+    // GESTIÓN DE PERSONAS
+    // Roles: Todos los autenticados
+    // ========================================
+
+    Route::get('/personas/by-email', [PersonaController::class, 'findByEmail'])
+        ->name('personas.byEmail');
+
+    // ========================================
+    // TICKETS Y SOLICITUDES
+    // Roles: Superadmin, Admin Evento, Subadmin Evento
+    // ========================================
+
+    // Ver solicitudes de tickets
+    Route::get('/admin/tickets/solicitudes', [TicketSolicitudController::class, 'index'])
         ->name('admin.tickets.solicitudes');
-
-        // Grupo de rutas para admin, opcionalmente con prefix/middleware según tu estructura
-    Route::post('/admin/tickets/solicitudes/{id}/aprobar', [\App\Http\Controllers\TicketSolicitudController::class, 'aprobar'])
+    
+    // Aprobar solicitud de ticket
+    Route::post('/admin/tickets/solicitudes/{id}/aprobar', [TicketSolicitudController::class, 'aprobar'])
         ->name('admin.tickets.solicitudes.aprobar');
-        Route::put('/eventos/{evento}/invitados/{invitado}/cambiar-cantidad', [EventoInvitadoController::class, 'cambiarCantidad'])
-        ->name('eventos.invitados.cambiar_cantidad');
 });
-Route::get('/eventos/{evento}/comprar', [EventoCompraController::class, 'showForm'])
-    ->name('eventos.publico.comprar');
 
-Route::post('/eventos/{evento}/comprar', [EventoCompraController::class, 'procesarCompra'])
-    ->name('eventos.publico.comprar.procesar');
-    // Procesar solicitud de compra de entradas para eventos públicos (POST)
-    // ---- CONFIRMACIONES ----
-    Route::get('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'verForm'])
-        ->name('invitacion.confirmar');
-    Route::post('/invitacion/confirmar', [App\Http\Controllers\ConfirmacionInvitacionController::class, 'procesarForm'])
-        ->name('invitacion.confirmar.procesar');
-        Route::get('/demo-qr', [App\Http\Controllers\QrDemoController::class, 'show']);
-// ---- Otros módulos ----
+// ========================================
+// MÓDULOS ADICIONALES
+// ========================================
+
+// Gestión de equipos de evento (admin + subadmins)
 require __DIR__.'/eventos_equipo.php';
+
+// Rutas de autenticación adicionales (registro, recuperar contraseña, etc.)
 require __DIR__.'/auth.php';
-// require __DIR__.'/admins.php'; // Este módulo está deshabilitado
+
+// Gestión de admins (deshabilitado)
+// require __DIR__.'/admins.php';

@@ -17,14 +17,18 @@
                 <span class="text-lg font-semibold">Control de Eventos</span>
             </a>
             <!-- Menú Desktop -->
-            <div class="hidden md:flex items-center gap-6">
-                <a href="{{ route('dashboard') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">Dashboard</a>
-                @auth
-                    @hasanyrole('superadmin|admin_evento|subadmin_evento')
-                        <a href="{{ route('eventos.index') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">
-                            Gestionar Eventos
-                        </a>
-                    @endhasanyrole
+            <!-- Menú Desktop -->
+                <div class="hidden md:flex items-center gap-6">
+                    <a href="{{ route('dashboard') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">Dashboard</a>
+                    @auth
+                        @hasanyrole('superadmin|admin_evento|subadmin_evento')
+                            <a href="{{ route('eventos.index') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+                                Gestionar Eventos
+                            </a>
+                            <a href="{{ route('accesos.index') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+                                🎫 Control de Acceso
+                            </a>
+                        @endhasanyrole
                     @role('invitado')
                         <a href="{{ route('events.index') }}" class="text-sm font-medium text-gray-700 hover:text-gray-900">
                             Ver Eventos Públicos
@@ -67,14 +71,17 @@
         </div>
         <!-- Menú Mobile (solo visible en mobile y cuando open==true) -->
         <div x-show="open" x-transition class="md:hidden" id="mobile-menu">
-            <div class="mt-3 flex flex-col gap-2 pb-4 border-b">
-                <a href="{{ route('dashboard') }}" class="block px-3 py-2 rounded text-base font-medium text-gray-700 hover:bg-gray-100">Dashboard</a>
-                @auth
-                    @hasanyrole('superadmin|admin_evento|subadmin_evento')
-                        <a href="{{ route('eventos.index') }}" class="block px-3 py-2 rounded text-base font-medium text-gray-700 hover:bg-gray-100">
-                            Gestionar Eventos
-                        </a>
-                    @endhasanyrole
+        <div class="mt-3 flex flex-col gap-2 pb-4 border-b">
+    <a href="{{ route('dashboard') }}" class="block px-3 py-2 rounded text-base font-medium text-gray-700 hover:bg-gray-100">Dashboard</a>
+    @auth
+        @hasanyrole('superadmin|admin_evento|subadmin_evento')
+            <a href="{{ route('eventos.index') }}" class="block px-3 py-2 rounded text-base font-medium text-gray-700 hover:bg-gray-100">
+                Gestionar Eventos
+            </a>
+            <a href="{{ route('accesos.index') }}" class="block px-3 py-2 rounded text-base font-medium text-gray-700 hover:bg-gray-100">
+                🎫 Control de Acceso
+            </a>
+        @endhasanyrole
                     @role('invitado')
                         <a href="{{ route('events.index') }}" class="block px-3 py-2 rounded text-base font-medium text-gray-700 hover:bg-gray-100">
                             Ver Eventos Públicos
