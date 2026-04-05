@@ -39,6 +39,11 @@ Route::post('/eventos/{evento}/comprar', [EventoCompraController::class, 'proces
 // Demo QR (para testing)
 Route::get('/demo-qr', [QrDemoController::class, 'show']);
 
+// ========== RUTA PÚBLICA PARA ESCANEAR QR DE INVITACIÓN ==========
+// Esta ruta NO requiere autenticación (se accede desde el QR de la invitación)
+Route::get('/evento/ingreso', [AccesoEventoController::class, 'procesarQrIngreso'])
+    ->name('evento.ingreso');
+
 // ========================================
 // RUTAS AUTENTICADAS (requieren login)
 // ========================================

@@ -55,110 +55,180 @@ class AccesoEventoController extends Controller
 
     // MÉTODO 3: Escanear QR y registrar entrada/salida
     public function escanearQr(Request $request, Evento $evento)
-    {
-        $this->authorize('manageGuests', $evento);
+{
+    $request->validate([
+        'token' => 'required|string'
+    ]);
 
-        $request->validate([
-            'token' => 'required|string',
+    // ========== CAMBIO IMPORTANTE: BUSCAR POR token_acceso ==========
+    // Antes buscábamos por 'token' (el de confirmación)
+    // Ahora buscamos por 'token_acceso' (el del QR de ingreso)
+    $invitacion = InvitacionEvento::where('token_acceso', $request->token)
+        ->where('evento_id', $evento->id)
+        ->where('confirmado', 1)
+        ->first();
+
+    if (!$invitacion) {
+        \Log::warning('[ACCESO] Token no encontrado', [
+            'token_recibido' => $request->token,
+            'evento_id' => $evento->id
         ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Invitación no válida o no confirmada.'
+        ], 400);
+    }
 
-        // Buscar la invitación por token
-        $invitacion = InvitacionEvento::where('token', $request->token)
-            ->where('evento_id', $evento->id)
-            ->where('confirmado', 1)
-            ->first();
+    // Obtener persona asociada
+    $persona = \App\Models\Persona::where('email', $invitacion->email)->first();
 
-        if (!$invitacion) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invitación no válida o no confirmada.'
-            ], 400);
-        }
+    if (!$persona) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Persona no encontrada en el sistema.'
+        ], 400);
+    }
 
-        // Verificar si está adentro o afuera
-        $ultimoAcceso = AccesoEvento::where('invitacion_id', $invitacion->id)
-            ->orderBy('fecha_hora', 'desc')
-            ->first();
+    // Determinar tipo de acceso (entrada o salida)
+    $ultimoAcceso = \App\Models\AccesoEvento::where('invitacion_id', $invitacion->id)
+        ->where('evento_id', $evento->id)
+        ->orderBy('fecha_hora', 'desc')
+        ->first();
 
-        // Determinar el tipo de movimiento
-        if (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') {
-            $tipo = 'entrada';
-        } else {
-            $tipo = 'salida';
-        }
+    $tipo = (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') ? 'entrada' : 'salida';
 
-        // Registrar el acceso
-        $acceso = AccesoEvento::create([
-            'evento_id' => $evento->id,
-            'invitacion_id' => $invitacion->id,
-            'tipo' => $tipo,
-            'metodo' => 'qr',
-            'registrado_por' => auth()->id(),
-        ]);
+    // Registrar el acceso
+    \App\Models\AccesoEvento::create([
+        'evento_id' => $evento->id,
+        'invitacion_id' => $invitacion->id,
+        'persona_id' => $persona->id,
+        'tipo' => $tipo,
+        'fecha_hora' => now(),
+    ]);
 
-        // Obtener datos de la persona
-        $persona = Persona::where('email', $invitacion->email)->first();
+    \Log::info('[ACCESO] Registrado correctamente', [
+        'tipo' => $tipo,
+        'persona' => $persona->nombre . ' ' . $persona->apellido,
+        'evento_id' => $evento->id
+    ]);
 
+    // Calcular personas adentro AHORA
+    $dentroAhora = \App\Models\AccesoEvento::from('accesos_evento as a1')
+        ->join(\DB::raw('(select invitacion_id, MAX(fecha_hora) as ultima_fecha 
+                          from accesos_evento 
+                          where evento_id = ' . $evento->id . ' and tipo = "entrada" 
+                          group by invitacion_id) as ult'), function($join) {
+            $join->on('a1.invitacion_id', '=', 'ult.invitacion_id')
+                 ->on('a1.fecha_hora', '=', 'ult.ultima_fecha');
+        })
+        ->whereNotExists(function($query) {
+            $query->select(\DB::raw(1))
+                  ->from('accesos_evento as a2')
+                  ->whereColumn('a2.invitacion_id', 'a1.invitacion_id')
+                  ->where('a2.tipo', 'salida')
+                  ->whereColumn('a2.fecha_hora', '>', 'a1.fecha_hora');
+        })
+        ->count();
+
+    return response()->json([
+        'success' => true,
+        'tipo' => $tipo,
+        'persona' => [
+            'nombre' => $persona->nombre,
+            'apellido' => $persona->apellido,
+            'email' => $persona->email,
+        ],
+        'dentro_ahora' => $dentroAhora,
+    ]);
+}
+
+    // MÉTODO 4: Ingreso manual por DNI
+    // MÉTODO 4: Ingreso manual por DNI
+public function ingresoManual(Request $request, Evento $evento)
+{
+    $this->authorize('manageGuests', $evento);
+
+    $request->validate([
+        'dni' => 'required|string',
+    ]);
+
+    // Buscar persona por DNI
+    $persona = Persona::where('dni', $request->dni)->first();
+
+    if (!$persona) {
+        return back()->withErrors(['dni' => 'No se encontró una persona con ese DNI.']);
+    }
+
+    // Buscar invitación por email de esa persona
+    $invitacion = InvitacionEvento::where('email', $persona->email)
+        ->where('evento_id', $evento->id)
+        ->where('confirmado', 1)
+        ->first();
+
+    if (!$invitacion) {
+        return back()->withErrors(['dni' => 'Esta persona no tiene una invitación confirmada para este evento.']);
+    }
+
+    // ========== CORRECCIÓN 1: FILTRAR POR EVENTO_ID ==========
+    // Verificar estado actual SOLO EN ESTE EVENTO
+    $ultimoAcceso = AccesoEvento::where('invitacion_id', $invitacion->id)
+        ->where('evento_id', $evento->id)  // ← AGREGADO: filtrar por este evento
+        ->orderBy('fecha_hora', 'desc')
+        ->first();
+
+    // Determinar tipo de acceso
+    if (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') {
+        $tipo = 'entrada';
+    } else {
+        $tipo = 'salida';
+    }
+
+    // Registrar acceso
+    AccesoEvento::create([
+        'evento_id' => $evento->id,
+        'invitacion_id' => $invitacion->id,
+        'tipo' => $tipo,
+        'metodo' => 'manual',
+        'registrado_por' => auth()->id(),
+    ]);
+
+    Log::info('[ACCESO MANUAL] Registrado', [
+        'tipo' => $tipo,
+        'persona' => $persona->nombre . ' ' . $persona->apellido,
+        'dni' => $persona->dni,
+        'evento_id' => $evento->id
+    ]);
+
+    // Calcular nuevos contadores
+    $dentroAhora = $this->contarDentroAhora($evento->id);
+    
+    $totalInvitados = InvitacionEvento::where('evento_id', $evento->id)
+        ->where('confirmado', 1)
+        ->sum('cantidad');
+    
+    $faltantes = $totalInvitados - $dentroAhora;
+
+    // ========== CORRECCIÓN 2: DEVOLVER JSON PARA AJAX ==========
+    // Si la petición es AJAX, devolver JSON (para actualizar contadores)
+    if ($request->ajax() || $request->wantsJson()) {
         return response()->json([
             'success' => true,
             'tipo' => $tipo,
             'persona' => [
-                'nombre' => $persona->nombre ?? 'Sin datos',
-                'apellido' => $persona->apellido ?? '',
-                'email' => $invitacion->email,
+                'nombre' => $persona->nombre,
+                'apellido' => $persona->apellido,
+                'dni' => $persona->dni,
             ],
-            'dentro_ahora' => $this->contarDentroAhora($evento->id),
+            'dentro_ahora' => $dentroAhora,
+            'total_invitados' => $totalInvitados,
+            'faltantes' => $faltantes,
         ]);
     }
 
-    // MÉTODO 4: Ingreso manual por DNI
-    public function ingresoManual(Request $request, Evento $evento)
-    {
-        $this->authorize('manageGuests', $evento);
-
-        $request->validate([
-            'dni' => 'required|string',
-        ]);
-
-        // Buscar persona por DNI
-        $persona = Persona::where('dni', $request->dni)->first();
-
-        if (!$persona) {
-            return back()->withErrors(['dni' => 'No se encontró una persona con ese DNI.']);
-        }
-
-        // Buscar invitación por email de esa persona
-        $invitacion = InvitacionEvento::where('email', $persona->email)
-            ->where('evento_id', $evento->id)
-            ->where('confirmado', 1)
-            ->first();
-
-        if (!$invitacion) {
-            return back()->withErrors(['dni' => 'Esta persona no tiene una invitación confirmada para este evento.']);
-        }
-
-        // Verificar estado actual
-        $ultimoAcceso = AccesoEvento::where('invitacion_id', $invitacion->id)
-            ->orderBy('fecha_hora', 'desc')
-            ->first();
-
-        if (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') {
-            $tipo = 'entrada';
-        } else {
-            $tipo = 'salida';
-        }
-
-        // Registrar acceso
-        AccesoEvento::create([
-            'evento_id' => $evento->id,
-            'invitacion_id' => $invitacion->id,
-            'tipo' => $tipo,
-            'metodo' => 'manual',
-            'registrado_por' => auth()->id(),
-        ]);
-
-        return back()->with('status', "Acceso registrado: {$tipo} para {$persona->nombre} {$persona->apellido}");
-    }
+    // Si NO es AJAX, redirigir con mensaje
+    return back()->with('status', "✅ {$tipo} registrada para {$persona->nombre} {$persona->apellido}");
+}
 
     // MÉTODO 5: Obtener historial de accesos (para mostrar en tabla)
     public function historial(Evento $evento)

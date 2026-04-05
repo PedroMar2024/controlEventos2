@@ -12,6 +12,7 @@ class InvitacionEvento extends Model
         'evento_id',
         'email',
         'token',
+        'token_acceso',        // ← NUEVO: agregalo acá
         'enviada',
         'fecha_envio',
         'fecha_confirmacion',

@@ -295,10 +295,18 @@ class EventoInvitadoController extends Controller
             $nombre = $persona->nombre ?? 'Sin nombre';
             $apellido = $persona->apellido ?? '';
 
-            // --- GENERAR EL QR CON LA LIBRERÍA NUEVA (SimpleSoftwareIO) ---
-            $qrData = route('invitacion.confirmar', ['token' => $inv->token]);
+            // ========== NUEVO: GENERAR TOKEN DE ACCESO ==========
+            if (empty($inv->token_acceso)) {
+                $inv->token_acceso = Str::random(32);
+                $inv->save();
+                Log::info('[TOKEN_ACCESO] Generado', ['invitacion_id' => $inv->id]);
+            }
+
+            // --- GENERAR EL QR CON EL TOKEN DE ACCESO (MODIFICADO) ---
+            $qrData = url('/evento/ingreso?token=' . $inv->token_acceso);
+            
             // Generar QR en SVG (no necesita Imagick)
-// Forzar uso de GD (no Imagick)
+            // Forzar uso de GD (no Imagick)
             $renderer = new \BaconQrCode\Renderer\ImageRenderer(
                 new \BaconQrCode\Renderer\RendererStyle\RendererStyle(180, 5),
                 new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
@@ -312,7 +320,7 @@ class EventoInvitadoController extends Controller
                 'invitado' => $inv,
                 'nombre' => $nombre,
                 'apellido' => $apellido,
-                'qrPng' => $qrPng,  // ← Cambiar qrPng por qrSvg
+                'qrPng' => $qrPng,
             ]);
             Log::info('[PDF] Generado OK', ['invitacion_id' => $inv->id]);
 

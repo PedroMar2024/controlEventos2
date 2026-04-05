@@ -76,7 +76,7 @@
             <!-- Mensaje de estado del escáner -->
             <div id="scanner-status" class="hidden mb-3 p-2 rounded text-sm"></div>
             
-            <button id="btn-abrir-scanner" onclick="abrirEscanerQR()" 
+            <button id="btn-abrir-scanner" type="button" onclick="abrirEscanerQR()" 
                     class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold">
                 📷 Abrir Escáner
             </button>
@@ -84,7 +84,7 @@
             <!-- Área de escaneo (inicialmente oculta) -->
             <div id="area-escaner" class="hidden mt-4">
                 <div id="reader" class="w-full border-2 border-indigo-400 rounded"></div>
-                <button onclick="cerrarEscanerQR()" 
+                <button type="button" onclick="cerrarEscanerQR()" 
                         class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded mt-2">
                     ❌ Cerrar Cámara
                 </button>
@@ -95,20 +95,20 @@
         <div class="bg-white border-2 border-emerald-300 rounded-xl shadow-md p-6">
             <h2 class="text-xl font-bold mb-4 text-emerald-700">✍️ Ingreso Manual</h2>
             <p class="text-gray-600 mb-4">Si el QR no funciona, ingresá el DNI manualmente.</p>
-            <form method="POST" action="{{ route('accesos.ingreso-manual', $evento->id) }}">
-                @csrf
-                <label for="dni" class="block text-sm font-semibold mb-2">DNI del invitado:</label>
-                <input type="text" 
-                       name="dni" 
-                       id="dni"
-                       placeholder="Ej: 12345678" 
-                       required
-                       class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-3 focus:border-emerald-500 focus:outline-none">
-                <button type="submit" 
-                        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold">
-                    ✅ Registrar Acceso
-                </button>
-            </form>
+            <form id="form-ingreso-manual" method="POST" action="{{ route('accesos.ingreso-manual', $evento->id) }}">
+    @csrf
+    <label for="dni" class="block text-sm font-semibold mb-2">DNI del invitado:</label>
+    <input type="text" 
+           name="dni" 
+           id="dni"
+           placeholder="Ej: 12345678" 
+           required
+           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-3 focus:border-emerald-500 focus:outline-none">
+    <button type="submit" 
+            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold">
+        ✅ Registrar Acceso
+    </button>
+</form>
         </div>
     </div>
 
@@ -161,6 +161,7 @@ function mostrarEstado(mensaje, tipo) {
     }
     
     statusDiv.textContent = mensaje;
+    statusDiv.classList.remove('hidden');
 }
 
 function abrirEscanerQR() {
@@ -217,7 +218,7 @@ function onScanSuccess(decodedText, decodedResult) {
     // Extraer el token de la URL escaneada
     let token = '';
     
-    // Caso 1: Si es una URL completa (http://dominio.com/invitacion/confirmar?token=XXX)
+    // Caso 1: Si es una URL completa (http://dominio.com/evento/ingreso?token=XXX)
     if (decodedText.includes('?token=')) {
         token = decodedText.split('?token=')[1];
     } 
@@ -235,10 +236,88 @@ function onScanSuccess(decodedText, decodedResult) {
     
     // Enviar al servidor
     fetch("{{ route('accesos.escanear-qr', $evento->id) }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ token: token })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const tipoTexto = data.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
+            const emoji = data.tipo === 'entrada' ? '✅' : '🔽';
+            
+            alert(`${emoji} ${tipoTexto} registrada\n\nPersona: ${data.persona.nombre} ${data.persona.apellido}\nEmail: ${data.persona.email}`);
+            
+            // Actualizar contadores
+            document.getElementById('contador-dentro').textContent = data.dentro_ahora;
+            const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
+            document.getElementById('contador-faltantes').textContent = faltantes;
+            
+            mostrarEstado(`✅ ${tipoTexto} registrada correctamente`, 'success');
+            
+            // Reabrir el escáner después de 2 segundos
+            setTimeout(() => {
+                abrirEscanerQR();
+            }, 2000);
+        } else {
+            alert('❌ Error: ' + data.message);
+            mostrarEstado('❌ ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error al procesar el código QR');
+        mostrarEstado('❌ Error de conexión', 'error');
+    });
+}
+
 function onScanError(errorMessage) {
     // Ignorar errores menores de escaneo (es normal mientras enfoca)
-    // Solo logueamos en consola para debugging
-    // console.log('Buscando QR...', errorMessage);
 }
+// ========================================
+// INGRESO MANUAL CON AJAX
+// ========================================
+document.getElementById('form-ingreso-manual').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const formData = new FormData(form);
+    const dniInput = document.getElementById('dni');
+    
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json',
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const tipoTexto = data.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
+            const emoji = data.tipo === 'entrada' ? '✅' : '🔽';
+            
+            alert(`${emoji} ${tipoTexto} registrada\n\nPersona: ${data.persona.nombre} ${data.persona.apellido}\nDNI: ${data.persona.dni}`);
+            
+            // Actualizar contadores
+            document.getElementById('contador-dentro').textContent = data.dentro_ahora;
+            document.getElementById('contador-faltantes').textContent = data.faltantes;
+            
+            // Limpiar el input
+            dniInput.value = '';
+            dniInput.focus();
+        } else {
+            alert('❌ Error: ' + (data.message || 'No se pudo registrar el acceso'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error al procesar el ingreso manual');
+    });
+});
 </script>
 @endsection
