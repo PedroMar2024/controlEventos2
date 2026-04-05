@@ -95,20 +95,20 @@
         <div class="bg-white border-2 border-emerald-300 rounded-xl shadow-md p-6">
             <h2 class="text-xl font-bold mb-4 text-emerald-700">✍️ Ingreso Manual</h2>
             <p class="text-gray-600 mb-4">Si el QR no funciona, ingresá el DNI manualmente.</p>
-            <form id="form-ingreso-manual" method="POST" action="{{ route('accesos.ingreso-manual', $evento->id) }}">
-    @csrf
-    <label for="dni" class="block text-sm font-semibold mb-2">DNI del invitado:</label>
-    <input type="text" 
-           name="dni" 
-           id="dni"
-           placeholder="Ej: 12345678" 
-           required
-           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-3 focus:border-emerald-500 focus:outline-none">
-    <button type="submit" 
-            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold">
-        ✅ Registrar Acceso
-    </button>
-</form>
+            <form id="form-ingreso-manual">
+                @csrf
+                <label for="dni" class="block text-sm font-semibold mb-2">DNI del invitado:</label>
+                <input type="text" 
+                    name="dni" 
+                    id="dni-input"
+                    placeholder="Ej: 12345678" 
+                    required
+                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-3 focus:border-emerald-500 focus:outline-none">
+                <button type="submit" 
+                        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold">
+                    ✅ Registrar Acceso
+                </button>
+            </form>
         </div>
     </div>
 
@@ -280,20 +280,27 @@ function onScanError(errorMessage) {
 // ========================================
 // INGRESO MANUAL CON AJAX
 // ========================================
+// ========================================
+// INGRESO MANUAL (IGUAL QUE EL QR)
+// ========================================
 document.getElementById('form-ingreso-manual').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const form = this;
-    const formData = new FormData(form);
-    const dniInput = document.getElementById('dni');
+    const dniInput = document.getElementById('dni-input');
+    const dni = dniInput.value.trim();
     
-    fetch(form.action, {
+    if (!dni) {
+        alert('❌ Por favor ingresá un DNI');
+        return;
+    }
+    
+    fetch("{{ route('accesos.ingreso-manual', $evento->id) }}", {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
-        body: formData
+        body: JSON.stringify({ dni: dni })
     })
     .then(response => response.json())
     .then(data => {
@@ -301,17 +308,18 @@ document.getElementById('form-ingreso-manual').addEventListener('submit', functi
             const tipoTexto = data.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
             const emoji = data.tipo === 'entrada' ? '✅' : '🔽';
             
-            alert(`${emoji} ${tipoTexto} registrada\n\nPersona: ${data.persona.nombre} ${data.persona.apellido}\nDNI: ${data.persona.dni}`);
+            alert(`${emoji} ${tipoTexto} registrada\n\nPersona: ${data.persona.nombre} ${data.persona.apellido}\nDNI: ${dni}`);
             
             // Actualizar contadores
             document.getElementById('contador-dentro').textContent = data.dentro_ahora;
-            document.getElementById('contador-faltantes').textContent = data.faltantes;
+            const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
+            document.getElementById('contador-faltantes').textContent = faltantes;
             
-            // Limpiar el input
+            // Limpiar input
             dniInput.value = '';
             dniInput.focus();
         } else {
-            alert('❌ Error: ' + (data.message || 'No se pudo registrar el acceso'));
+            alert('❌ Error: ' + data.message);
         }
     })
     .catch(error => {

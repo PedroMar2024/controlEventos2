@@ -145,7 +145,15 @@ class AccesoEventoController extends Controller
 
     // MÉTODO 4: Ingreso manual por DNI
     // MÉTODO 4: Ingreso manual por DNI
+// MÉTODO 4: Ingreso manual por DNI
 public function ingresoManual(Request $request, Evento $evento)
+   // ========== DEBUG TEMPORAL ==========
+   Log::info('========== INGRESO MANUAL INICIADO ==========');
+   Log::info('DNI recibido', ['dni' => $request->dni]);
+   Log::info('Evento ID', ['evento_id' => $evento->id]);
+   Log::info('Request completo', ['request' => $request->all()]);
+   // =====================================
+   
 {
     $this->authorize('manageGuests', $evento);
 
@@ -157,7 +165,10 @@ public function ingresoManual(Request $request, Evento $evento)
     $persona = Persona::where('dni', $request->dni)->first();
 
     if (!$persona) {
-        return back()->withErrors(['dni' => 'No se encontró una persona con ese DNI.']);
+        return response()->json([
+            'success' => false,
+            'message' => 'No se encontró una persona con ese DNI.'
+        ], 400);
     }
 
     // Buscar invitación por email de esa persona
@@ -167,24 +178,26 @@ public function ingresoManual(Request $request, Evento $evento)
         ->first();
 
     if (!$invitacion) {
-        return back()->withErrors(['dni' => 'Esta persona no tiene una invitación confirmada para este evento.']);
+        return response()->json([
+            'success' => false,
+            'message' => 'Esta persona no tiene una invitación confirmada para este evento.'
+        ], 400);
     }
 
-    // ========== CORRECCIÓN 1: FILTRAR POR EVENTO_ID ==========
-    // Verificar estado actual SOLO EN ESTE EVENTO
+    // Verificar si está adentro o afuera
     $ultimoAcceso = AccesoEvento::where('invitacion_id', $invitacion->id)
-        ->where('evento_id', $evento->id)  // ← AGREGADO: filtrar por este evento
+        ->where('evento_id', $evento->id)
         ->orderBy('fecha_hora', 'desc')
         ->first();
 
-    // Determinar tipo de acceso
+    // Determinar el tipo de movimiento
     if (!$ultimoAcceso || $ultimoAcceso->tipo === 'salida') {
         $tipo = 'entrada';
     } else {
         $tipo = 'salida';
     }
 
-    // Registrar acceso
+    // Registrar el acceso
     AccesoEvento::create([
         'evento_id' => $evento->id,
         'invitacion_id' => $invitacion->id,
@@ -193,41 +206,17 @@ public function ingresoManual(Request $request, Evento $evento)
         'registrado_por' => auth()->id(),
     ]);
 
-    Log::info('[ACCESO MANUAL] Registrado', [
+    // ========== DEVOLVER JSON IGUAL QUE escanearQr ==========
+    return response()->json([
+        'success' => true,
         'tipo' => $tipo,
-        'persona' => $persona->nombre . ' ' . $persona->apellido,
-        'dni' => $persona->dni,
-        'evento_id' => $evento->id
+        'persona' => [
+            'nombre' => $persona->nombre ?? 'Sin datos',
+            'apellido' => $persona->apellido ?? '',
+            'email' => $invitacion->email,
+        ],
+        'dentro_ahora' => $this->contarDentroAhora($evento->id),
     ]);
-
-    // Calcular nuevos contadores
-    $dentroAhora = $this->contarDentroAhora($evento->id);
-    
-    $totalInvitados = InvitacionEvento::where('evento_id', $evento->id)
-        ->where('confirmado', 1)
-        ->sum('cantidad');
-    
-    $faltantes = $totalInvitados - $dentroAhora;
-
-    // ========== CORRECCIÓN 2: DEVOLVER JSON PARA AJAX ==========
-    // Si la petición es AJAX, devolver JSON (para actualizar contadores)
-    if ($request->ajax() || $request->wantsJson()) {
-        return response()->json([
-            'success' => true,
-            'tipo' => $tipo,
-            'persona' => [
-                'nombre' => $persona->nombre,
-                'apellido' => $persona->apellido,
-                'dni' => $persona->dni,
-            ],
-            'dentro_ahora' => $dentroAhora,
-            'total_invitados' => $totalInvitados,
-            'faltantes' => $faltantes,
-        ]);
-    }
-
-    // Si NO es AJAX, redirigir con mensaje
-    return back()->with('status', "✅ {$tipo} registrada para {$persona->nombre} {$persona->apellido}");
 }
 
     // MÉTODO 5: Obtener historial de accesos (para mostrar en tabla)
