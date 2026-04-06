@@ -171,6 +171,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/accesos/{evento}/historial', [AccesoEventoController::class, 'historial'])
         ->middleware('can:manageGuests,evento')
         ->name('accesos.historial');
+        Route::post('/accesos/{evento}/consultar', [AccesoEventoController::class, 'consultarInvitacion'])->name('accesos.consultar');
+Route::post('/accesos/{evento}/confirmar', [AccesoEventoController::class, 'confirmarAcceso'])->name('accesos.confirmar');
 
     // ========================================
     // GESTIÓN DE PERSONAS

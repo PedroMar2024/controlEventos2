@@ -138,62 +138,136 @@
 <!-- ========================================
      MODAL FLOTANTE PARA MOSTRAR RESULTADO
      ======================================== -->
+<div<!-- ========================================
+     MODAL FLOTANTE PARA CONSULTA Y CONFIRMACIÓN
+     ======================================== -->
 <div id="modal-resultado" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-        <!-- Header del modal -->
-        <div id="modal-header" class="px-6 py-4 text-white text-center">
-            <h3 id="modal-titulo" class="text-2xl font-bold"></h3>
+        <!-- PASO 1: Mostrar información y elegir tipo -->
+        <div id="paso-consulta">
+            <!-- Header del modal -->
+            <div class="px-6 py-4 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white text-center">
+                <h3 class="text-2xl font-bold">📋 INFORMACIÓN DE ACCESO</h3>
+            </div>
+            
+            <!-- Contenido del modal -->
+            <div class="px-6 py-6">
+                <!-- Nombre del evento -->
+                <div class="mb-6 text-center bg-indigo-50 rounded-lg py-3 px-4">
+                    <p class="text-sm text-gray-600 mb-1">Evento</p>
+                    <p class="text-xl font-bold text-indigo-900" id="modal-evento"></p>
+                </div>
+                
+                <!-- Información de la persona -->
+                <div class="mb-6">
+                    <p class="text-lg font-semibold text-gray-800 mb-2">
+                        <span class="text-gray-600">👤</span> <span id="modal-nombre"></span>
+                    </p>
+                    <p class="text-md text-gray-700">
+                        <span class="text-gray-600">🎫 DNI:</span> <span id="modal-dni"></span>
+                    </p>
+                </div>
+                
+                <hr class="my-4 border-gray-300">
+                
+                <!-- Información de cupos -->
+                <div class="space-y-3 mb-6">
+                    <div class="flex justify-between items-center bg-gray-50 rounded-lg px-4 py-3">
+                        <span class="text-gray-700 font-medium">Válido por:</span>
+                        <span id="modal-cupos-total" class="text-2xl font-bold text-gray-800"></span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center bg-emerald-50 rounded-lg px-4 py-3">
+                        <span class="text-emerald-700 font-medium">Ingresados:</span>
+                        <span id="modal-cupos-ingresados" class="text-2xl font-bold text-emerald-600"></span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center bg-orange-50 rounded-lg px-4 py-3">
+                        <span class="text-orange-700 font-medium">Disponibles:</span>
+                        <span id="modal-cupos-disponibles" class="text-2xl font-bold text-orange-600"></span>
+                    </div>
+                </div>
+                
+                <hr class="my-4 border-gray-300">
+                
+                <!-- Selección de tipo (ENTRADA o SALIDA) -->
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold mb-2 text-gray-700">Tipo de movimiento:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" 
+                                id="btn-tipo-entrada" 
+                                onclick="seleccionarTipo('entrada')"
+                                class="px-4 py-3 rounded-lg font-semibold text-white bg-green-600 hover:bg-green-700">
+                            ✅ ENTRADA
+                        </button>
+                        <button type="button" 
+                                id="btn-tipo-salida" 
+                                onclick="seleccionarTipo('salida')"
+                                class="px-4 py-3 rounded-lg font-semibold border-2 border-gray-300 text-gray-700 bg-white hover:bg-gray-50">
+                            🔽 SALIDA
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Cantidad de personas -->
+                <div class="mb-4">
+                    <label for="modal-cantidad" class="block text-sm font-semibold mb-2 text-gray-700">¿Cuántas personas?</label>
+                    <input type="number" 
+                           id="modal-cantidad" 
+                           value="1" 
+                           min="1" 
+                           max="10"
+                           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-center text-2xl font-bold focus:border-indigo-500 focus:outline-none">
+                </div>
+            </div>
+            
+            <!-- Footer del modal -->
+            <div class="px-6 py-4 bg-gray-50 flex gap-3">
+                <button onclick="cerrarModal()" 
+                        class="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold text-lg">
+                    CANCELAR
+                </button>
+                <button onclick="confirmarAcceso()" 
+                        class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold text-lg">
+                    CONFIRMAR
+                </button>
+            </div>
         </div>
         
-        <!-- Contenido del modal -->
-        <div class="px-6 py-6">
-            <!-- Información de la persona -->
-            <div class="mb-6">
-                <p class="text-lg font-semibold text-gray-800 mb-2" id="modal-nombre"></p>
-                <p class="text-sm text-gray-600" id="modal-email"></p>
-                <p class="text-sm text-gray-600" id="modal-dni"></p>
+        <!-- PASO 2: Mostrar mensaje de confirmación (GRACIAS) -->
+        <div id="paso-gracias" class="hidden">
+            <div class="px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-center">
+                <h3 class="text-2xl font-bold">✅ REGISTRADO</h3>
             </div>
             
-            <hr class="my-4 border-gray-300">
-            
-            <!-- Información del movimiento -->
-            <div class="space-y-3">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-700 font-medium">Personas en este movimiento:</span>
-                    <span id="modal-personas-movimiento" class="text-xl font-bold text-indigo-600"></span>
-                </div>
+            <div class="px-6 py-8 text-center">
+                <p class="text-4xl font-bold text-green-600 mb-4">GRACIAS</p>
                 
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-700 font-medium">Personas adentro (esta invitación):</span>
-                    <span id="modal-personas-dentro" class="text-xl font-bold text-emerald-600"></span>
-                </div>
-                
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-700 font-medium">Total permitido:</span>
-                    <span id="modal-total-permitido" class="text-xl font-bold text-gray-800"></span>
-                </div>
-                
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-700 font-medium">Lugares disponibles:</span>
-                    <span id="modal-disponibles" class="text-xl font-bold text-orange-600"></span>
+                <!-- Información actualizada de cupos -->
+                <div class="space-y-3 mb-6">
+                    <div class="flex justify-between items-center bg-gray-50 rounded-lg px-4 py-3">
+                        <span class="text-gray-700 font-medium">Válido por:</span>
+                        <span id="gracias-cupos-total" class="text-xl font-bold text-gray-800"></span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center bg-emerald-50 rounded-lg px-4 py-3">
+                        <span class="text-emerald-700 font-medium">Ingresados:</span>
+                        <span id="gracias-cupos-ingresados" class="text-xl font-bold text-emerald-600"></span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center bg-orange-50 rounded-lg px-4 py-3">
+                        <span class="text-orange-700 font-medium">Disponibles:</span>
+                        <span id="gracias-cupos-disponibles" class="text-xl font-bold text-orange-600"></span>
+                    </div>
                 </div>
             </div>
             
-            <hr class="my-4 border-gray-300">
-            
-            <!-- Total en el evento -->
-            <div class="bg-indigo-50 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-600 mb-1">Total personas en el evento</p>
-                <p id="modal-total-evento" class="text-3xl font-bold text-indigo-600"></p>
+            <div class="px-6 py-4 bg-gray-50 text-center">
+                <button onclick="cerrarModal()" 
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold text-lg">
+                    ACEPTAR
+                </button>
             </div>
-        </div>
-        
-        <!-- Footer del modal -->
-        <div class="px-6 py-4 bg-gray-50 text-center">
-            <button onclick="cerrarModal()" 
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold text-lg w-full">
-                ACEPTAR
-            </button>
         </div>
     </div>
 </div>
@@ -202,6 +276,12 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script>
+// ========================================
+// VARIABLES GLOBALES
+// ========================================
+let invitacionActual = null;
+let tipoSeleccionado = 'entrada'; // Por defecto entrada
+
 // ========================================
 // RELOJ EN TIEMPO REAL
 // ========================================
@@ -220,41 +300,106 @@ actualizarReloj();
 // ========================================
 // FUNCIONES DEL MODAL
 // ========================================
-function mostrarModal(data) {
-    const modal = document.getElementById('modal-resultado');
-    const header = document.getElementById('modal-header');
-    const titulo = document.getElementById('modal-titulo');
+function mostrarModalConsulta(data) {
+    invitacionActual = data;
     
-    // Configurar color según tipo
-    if (data.tipo === 'entrada') {
-        header.className = 'px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-center';
-        titulo.textContent = '✅ ENTRADA REGISTRADA';
-    } else {
-        header.className = 'px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center';
-        titulo.textContent = '🔽 SALIDA REGISTRADA';
-    }
+    // Llenar datos del evento
+    document.getElementById('modal-evento').textContent = data.evento.nombre;
     
     // Llenar datos de la persona
-    document.getElementById('modal-nombre').textContent = `👤 ${data.persona.nombre} ${data.persona.apellido}`;
-    document.getElementById('modal-email').textContent = `📧 ${data.persona.email}`;
-    document.getElementById('modal-dni').textContent = data.persona.dni ? `🎫 DNI: ${data.persona.dni}` : '';
+    document.getElementById('modal-nombre').textContent = data.persona.nombre + ' ' + data.persona.apellido;
+    document.getElementById('modal-dni').textContent = data.persona.dni || 'Sin DNI';
     
-    // Llenar datos del movimiento
-    document.getElementById('modal-personas-movimiento').textContent = data.personas_movimiento || 1;
-    document.getElementById('modal-personas-dentro').textContent = data.personas_dentro_invitacion || 0;
-    document.getElementById('modal-total-permitido').textContent = data.total_permitido || 0;
+    // Llenar cupos
+    document.getElementById('modal-cupos-total').textContent = data.cupos.total + ' personas';
+    document.getElementById('modal-cupos-ingresados').textContent = data.cupos.ingresados + ' personas';
+    document.getElementById('modal-cupos-disponibles').textContent = data.cupos.disponibles + ' personas';
     
-    const disponibles = (data.total_permitido || 0) - (data.personas_dentro_invitacion || 0);
-    document.getElementById('modal-disponibles').textContent = disponibles;
+    // Seleccionar tipo sugerido
+    seleccionarTipo(data.tipo_sugerido);
     
-    document.getElementById('modal-total-evento').textContent = data.dentro_ahora || 0;
+    // Resetear cantidad
+    document.getElementById('modal-cantidad').value = 1;
+    
+    // Mostrar paso 1 (consulta)
+    document.getElementById('paso-consulta').classList.remove('hidden');
+    document.getElementById('paso-gracias').classList.add('hidden');
     
     // Mostrar modal
-    modal.classList.remove('hidden');
+    document.getElementById('modal-resultado').classList.remove('hidden');
+}
+
+function seleccionarTipo(tipo) {
+    tipoSeleccionado = tipo;
+    
+    const btnEntrada = document.getElementById('btn-tipo-entrada');
+    const btnSalida = document.getElementById('btn-tipo-salida');
+    
+    if (tipo === 'entrada') {
+        btnEntrada.className = 'px-4 py-3 rounded-lg font-semibold text-white bg-green-600 hover:bg-green-700';
+        btnSalida.className = 'px-4 py-3 rounded-lg font-semibold border-2 border-gray-300 text-gray-700 bg-white hover:bg-gray-50';
+    } else {
+        btnSalida.className = 'px-4 py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700';
+        btnEntrada.className = 'px-4 py-3 rounded-lg font-semibold border-2 border-gray-300 text-gray-700 bg-white hover:bg-gray-50';
+    }
+}
+
+function confirmarAcceso() {
+    const cantidad = parseInt(document.getElementById('modal-cantidad').value) || 1;
+    
+    if (!invitacionActual) {
+        alert('❌ Error: No hay invitación seleccionada');
+        return;
+    }
+    
+    // Enviar confirmación al servidor
+    fetch("{{ route('accesos.confirmar', $evento->id) }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            invitacion_id: invitacionActual.invitacion_id,
+            tipo: tipoSeleccionado,
+            personas: cantidad
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Actualizar contadores globales
+            document.getElementById('contador-dentro').textContent = data.dentro_ahora;
+            const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
+            document.getElementById('contador-faltantes').textContent = faltantes;
+            
+            // Mostrar paso 2 (gracias)
+            mostrarGracias(data);
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error al confirmar el acceso');
+    });
+}
+
+function mostrarGracias(data) {
+    // Llenar cupos actualizados
+    document.getElementById('gracias-cupos-total').textContent = data.cupos.total + ' personas';
+    document.getElementById('gracias-cupos-ingresados').textContent = data.cupos.ingresados + ' personas';
+    document.getElementById('gracias-cupos-disponibles').textContent = data.cupos.disponibles + ' personas';
+    
+    // Ocultar paso 1, mostrar paso 2
+    document.getElementById('paso-consulta').classList.add('hidden');
+    document.getElementById('paso-gracias').classList.remove('hidden');
 }
 
 function cerrarModal() {
     document.getElementById('modal-resultado').classList.add('hidden');
+    invitacionActual = null;
+    tipoSeleccionado = 'entrada';
 }
 
 // ========================================
@@ -325,7 +470,7 @@ function cerrarEscanerQR() {
 
 function onScanSuccess(decodedText, decodedResult) {
     cerrarEscanerQR();
-    mostrarEstado('⏳ Procesando código QR...', 'info');
+    mostrarEstado('⏳ Consultando información...', 'info');
     
     let token = '';
     if (decodedText.includes('?token=')) {
@@ -336,33 +481,23 @@ function onScanSuccess(decodedText, decodedResult) {
         token = decodedText.split('/').pop().split('?token=').pop();
     }
     
-    fetch("{{ route('accesos.escanear-qr', $evento->id) }}", {
+    // Consultar información (sin registrar)
+    fetch("{{ route('accesos.consultar', $evento->id) }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
         body: JSON.stringify({ 
-            token: token,
-            personas: 1
+            token: token
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Actualizar contadores
-            document.getElementById('contador-dentro').textContent = data.dentro_ahora;
-            const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
-            document.getElementById('contador-faltantes').textContent = faltantes;
-            
-            // Mostrar modal
-            mostrarModal(data);
-            
-            mostrarEstado(`✅ ${data.tipo.toUpperCase()} registrada correctamente`, 'success');
-            
-            setTimeout(() => {
-                abrirEscanerQR();
-            }, 2000);
+            // Mostrar modal con la información
+            mostrarModalConsulta(data);
+            mostrarEstado('✅ Información cargada', 'success');
         } else {
             alert('❌ Error: ' + data.message);
             mostrarEstado('❌ ' + data.message, 'error');
@@ -370,7 +505,7 @@ function onScanSuccess(decodedText, decodedResult) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('❌ Error al procesar el código QR');
+        alert('❌ Error al consultar la invitación');
         mostrarEstado('❌ Error de conexión', 'error');
     });
 }
@@ -386,48 +521,39 @@ document.getElementById('form-ingreso-manual').addEventListener('submit', functi
     e.preventDefault();
     
     const dniInput = document.getElementById('dni-input');
-    const personasInput = document.getElementById('personas-manual');
     const dni = dniInput.value.trim();
-    const personas = parseInt(personasInput.value) || 1;
     
     if (!dni) {
         alert('❌ Por favor ingresá un DNI');
         return;
     }
     
-    fetch("{{ route('accesos.ingreso-manual', $evento->id) }}", {
+    // Consultar información (sin registrar)
+    fetch("{{ route('accesos.consultar', $evento->id) }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
         body: JSON.stringify({ 
-            dni: dni,
-            personas: personas
+            dni: dni
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Actualizar contadores
-            document.getElementById('contador-dentro').textContent = data.dentro_ahora;
-            const faltantes = {{ $totalInvitados }} - data.dentro_ahora;
-            document.getElementById('contador-faltantes').textContent = faltantes;
+            // Mostrar modal con la información
+            mostrarModalConsulta(data);
             
-            // Mostrar modal
-            mostrarModal(data);
-            
-            // Limpiar inputs
+            // Limpiar input
             dniInput.value = '';
-            personasInput.value = '1';
-            dniInput.focus();
         } else {
             alert('❌ Error: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('❌ Error al procesar el ingreso manual');
+        alert('❌ Error al consultar la invitación');
     });
 });
 </script>
