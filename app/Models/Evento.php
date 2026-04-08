@@ -6,35 +6,39 @@ use Illuminate\Database\Eloquent\Model;
 
 class Evento extends Model
 {
-    protected $table = 'eventos';
 
-    protected $fillable = [
-        'nombre',
-        'admin_persona_id',
-        'fecha_evento',
-        'hora_inicio',
-        'hora_cierre',
-        'ubicacion',
-        'localidad',
-        'provincia',
-        'capacidad',
-        'estado',
-        'descripcion',
-        'precio_evento',
-        'publico',
-        'reingreso',
-    ];
-
-    protected $casts = [
-        'fecha_evento' => 'date',
-        // TIME se maneja como string
-        'hora_inicio'  => 'string',
-        'hora_cierre'  => 'string',
-        'capacidad'    => 'integer',
-        'precio_evento'=> 'decimal:2',
-        'publico'      => 'boolean',
-        'reingreso'    => 'boolean',
-    ];
+        protected $table = 'eventos';
+    
+        protected $fillable = [
+            'nombre',
+            'admin_persona_id',
+            'fecha_evento',
+            'hora_inicio',
+            'hora_cierre',
+            'ubicacion',
+            'latitud',      // ← NUEVA
+            'longitud',     // ← NUEVA
+            'localidad',
+            'provincia',
+            'capacidad',
+            'estado',
+            'descripcion',
+            'precio_evento',
+            'publico',
+            'reingreso',
+        ];
+    
+        protected $casts = [
+            'fecha_evento' => 'date',
+            'hora_inicio'  => 'string',
+            'hora_cierre'  => 'string',
+            'capacidad'    => 'integer',
+            'precio_evento'=> 'decimal:2',
+            'publico'      => 'boolean',
+            'reingreso'    => 'boolean',
+            'latitud'      => 'decimal:8',  // ← NUEVA
+            'longitud'     => 'decimal:8',  // ← NUEVA
+        ];
 
     // Admin del evento
     public function adminPersona()

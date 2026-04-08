@@ -122,28 +122,57 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Ubicación</label>
-                            <input type="text" name="ubicacion" id="ubicacion" value="{{ old('ubicacion') }}"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('ubicacion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Localidad</label>
-                            <input type="text" name="localidad" id="localidad" value="{{ old('localidad') }}"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('localidad') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Provincia</label>
-                            <input type="text" name="provincia" id="provincia" value="{{ old('provincia') }}"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('provincia') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                        </div>
+                    <div class="space-y-6">
+    {{-- Campo de búsqueda de dirección con autocompletado --}}
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            📍 Dirección del evento
+            <span class="text-xs text-gray-500">(Empezá a escribir y seleccioná de las opciones)</span>
+        </label>
+        <input type="text" 
+               id="ubicacion-search" 
+               placeholder="Ej: Teatro Gran Rex, Buenos Aires"
+               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
+               autocomplete="off">
+        
+        {{-- Lista de sugerencias (se llena con JavaScript) --}}
+        <div id="ubicacion-suggestions" class="mt-2 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
+        
+        {{-- Indicador de carga --}}
+        <p id="ubicacion-loading" class="mt-2 text-sm text-blue-600 hidden">🔍 Buscando...</p>
+    </div>
+
+    {{-- Mapa interactivo (se muestra cuando se selecciona una dirección) --}}
+    <div id="map-container" class="hidden">
+        <label class="block text-sm font-medium text-gray-700 mb-2">🗺️ Ubicación en el mapa</label>
+        <div id="map" class="w-full h-64 rounded-lg border-2 border-gray-300"></div>
+    </div>
+
+    {{-- Campos ocultos para enviar al servidor --}}
+    <input type="hidden" name="ubicacion" id="ubicacion" value="{{ old('ubicacion') }}">
+    <input type="hidden" name="latitud" id="latitud" value="{{ old('latitud') }}">
+    <input type="hidden" name="longitud" id="longitud" value="{{ old('longitud') }}">
+    <input type="hidden" name="localidad" id="localidad" value="{{ old('localidad') }}">
+    <input type="hidden" name="provincia" id="provincia" value="{{ old('provincia') }}">
+
+    {{-- Información seleccionada (feedback visual para el usuario) --}}
+    <div id="ubicacion-info" class="hidden p-4 bg-green-50 border border-green-200 rounded-md">
+        <p class="text-sm font-medium text-green-800">✅ Ubicación confirmada:</p>
+        <p id="ubicacion-display" class="text-sm text-gray-700 mt-1"></p>
+        <p class="text-xs text-gray-500 mt-1">
+            <span id="coordenadas-display"></span>
+        </p>
+        <button type="button" 
+                id="cambiar-ubicacion" 
+                class="mt-2 text-xs text-blue-600 hover:text-blue-800 underline">
+            Cambiar ubicación
+        </button>
+    </div>
+
+    @error('ubicacion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+    @error('latitud') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+    @error('longitud') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+</div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="flex items-center">
@@ -246,4 +275,20 @@
   });
 </script>
 @endrole
+{{-- ============================================ --}}
+{{-- LIBRERÍAS Y SCRIPTS PARA GEOCODIFICACIÓN   --}}
+{{-- ============================================ --}}
+
+{{-- CSS de Leaflet (mapa) --}}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+      crossorigin="anonymous" />
+
+{{-- JavaScript de Leaflet (mapa) --}}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+        crossorigin="anonymous"></script>
+
+{{-- Nuestro script personalizado de geocodificación --}}
+<script src="{{ asset('js/geocoder.js') }}"></script>
 @endsection
