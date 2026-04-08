@@ -48,7 +48,7 @@
             // NUEVA: Llamada al backend (proxy seguro)
             // ========================================
             const response = await fetch(
-                `/api/geocode?address=${encodeURIComponent(query)}&region=ar`,
+                `/api/geocode?address=${encodeURIComponent(query + ', Santa Cruz, Argentina')}&components=country:AR|administrative_area:Santa Cruz`,
                 {
                     headers: {
                         'Accept': 'application/json'
@@ -188,12 +188,43 @@
     // ========================================
     
     // Búsqueda con debounce
-    searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            buscarDirecciones(e.target.value);
-        }, 500);
-    });
+    // ========================================
+// 3. DEBOUNCE (Esperar antes de buscar)
+// ========================================
+let debounceTimer = null;
+
+searchInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    // Limpiar búsqueda anterior si estaba pendiente
+    if (debounceTimer) {
+        clearTimeout(debounceTimer);
+    }
+    
+    // Si el campo está vacío, ocultar sugerencias
+    if (query.length === 0) {
+        suggestionsBox.classList.add('hidden');
+        loadingIndicator.classList.add('hidden');
+        return;
+    }
+    
+    // Si hay menos de 3 caracteres, no buscar todavía
+    if (query.length < 3) {
+        suggestionsBox.innerHTML = '<div class="p-3 text-sm text-gray-500">Escribí al menos 3 caracteres</div>';
+        suggestionsBox.classList.remove('hidden');
+        loadingIndicator.classList.add('hidden');
+        return;
+    }
+    
+    // Mostrar indicador de carga
+    loadingIndicator.classList.remove('hidden');
+    suggestionsBox.classList.add('hidden');
+    
+    // DEBOUNCE: Esperar 500ms antes de buscar
+    debounceTimer = setTimeout(() => {
+        buscarDirecciones(query);
+    }, 500);
+});
     
     // Ocultar sugerencias si hacés click fuera
     document.addEventListener('click', (e) => {
