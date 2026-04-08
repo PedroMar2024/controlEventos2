@@ -123,6 +123,10 @@
                     </div>
 
                     <div class="space-y-6">
+                    {{-- ============================================ --}}
+{{-- SECCIÓN: UBICACIÓN DEL EVENTO             --}}
+{{-- ============================================ --}}
+<div class="space-y-6">
     {{-- Campo de búsqueda de dirección con autocompletado --}}
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -136,7 +140,7 @@
                autocomplete="off">
         
         {{-- Lista de sugerencias (se llena con JavaScript) --}}
-        <div id="ubicacion-suggestions" class="mt-2 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
+        <div id="ubicacion-suggestions" class="mt-2 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-60 overflow-y-auto z-50"></div>
         
         {{-- Indicador de carga --}}
         <p id="ubicacion-loading" class="mt-2 text-sm text-blue-600 hidden">🔍 Buscando...</p>
@@ -173,28 +177,36 @@
     @error('latitud') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
     @error('longitud') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
 </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="flex items-center">
-                            <input type="checkbox" id="publico" name="publico" value="1" {{ old('publico') ? 'checked' : '' }}
-                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-600">
-                            <label for="publico" class="ml-2 text-sm text-gray-700">Evento público</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="reingreso" name="reingreso" value="1" {{ old('reingreso') ? 'checked' : '' }}
-                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-600">
-                            <label for="reingreso" class="ml-2 text-sm text-gray-700">Permitir reingreso</label>
-                        </div>
-                    </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Descripción</label>
-                        <textarea name="descripcion" rows="4"
-                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
-                                  placeholder="Detalles del evento, agenda, notas, etc.">{{ old('descripcion') }}</textarea>
-                        @error('descripcion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                    </div>
+{{-- ============================================ --}}
+{{-- SECCIÓN: CHECKBOXES (Público / Reingreso)  --}}
+{{-- ============================================ --}}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="flex items-center">
+        <input type="checkbox" name="publico" id="publico" value="1" 
+               {{ old('publico') ? 'checked' : '' }}
+               class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+        <label for="publico" class="ml-2 text-sm text-gray-700">Evento público</label>
+    </div>
+    
+    <div class="flex items-center">
+        <input type="checkbox" name="reingreso" id="reingreso" value="1" 
+               {{ old('reingreso') ? 'checked' : '' }}
+               class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+        <label for="reingreso" class="ml-2 text-sm text-gray-700">Permitir reingreso</label>
+    </div>
+</div>
 
+{{-- ============================================ --}}
+{{-- SECCIÓN: DESCRIPCIÓN DEL EVENTO            --}}
+{{-- ============================================ --}}
+<div>
+    <label class="block text-sm font-medium text-gray-700">Descripción</label>
+    <textarea name="descripcion" rows="4"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"
+              placeholder="Detalles del evento, agenda, notas, etc.">{{ old('descripcion') }}</textarea>
+    @error('descripcion') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+</div>
                     {{-- REMOVIDO: @include('eventos._tickets') Aquí NO VA en el create --}}
                     
                     <div class="flex items-center gap-3">

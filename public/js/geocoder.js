@@ -44,22 +44,36 @@
         loadingIndicator.classList.remove('hidden');
         
         try {
-            // Llamada a Nominatim (OpenStreetMap) - GRATIS
+            // ========================================
+            // NUEVA: Llamada al backend (proxy seguro)
+            // ========================================
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?` +
-                `q=${encodeURIComponent(query)}` +
-                `&format=json` +
-                `&addressdetails=1` +
-                `&limit=5` +
-                `&countrycodes=ar`, // Filtra solo Argentina
+                `/api/geocode?address=${encodeURIComponent(query)}&region=ar`,
                 {
                     headers: {
-                        'User-Agent': 'ControlEventos/1.0'
+                        'Accept': 'application/json'
                     }
                 }
             );
             
-            const resultados = await response.json();
+            if (!response.ok) {
+                throw new Error('Error en la búsqueda');
+            }
+            
+            const data = await response.json();
+            
+            // Adaptamos el formato de Google Maps al formato que espera mostrarSugerencias()
+            const resultados = data.results.map(lugar => ({
+                lat: lugar.geometry.location.lat,
+                lon: lugar.geometry.location.lng,
+                display_name: lugar.formatted_address,
+                address: {
+                    city: lugar.locality || '',
+                    town: lugar.locality || '',
+                    state: lugar.administrative_area_level_1 || ''
+                }
+            }));
+            
             mostrarSugerencias(resultados);
             
         } catch (error) {

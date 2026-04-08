@@ -205,6 +205,10 @@ require __DIR__.'/eventos_equipo.php';
 
 // Rutas de autenticación adicionales (registro, recuperar contraseña, etc.)
 require __DIR__.'/auth.php';
+// ========================================
+// GEOCODIFICACIÓN (Google Maps)
+// ========================================
+require __DIR__.'/geocoding.php';
 
 // Gestión de admins (deshabilitado)
 // require __DIR__.'/admins.php';
